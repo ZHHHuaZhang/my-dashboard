@@ -22,6 +22,14 @@
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @media (max-width: 640px) {
+            input, select, textarea { font-size: 16px !important; }
+            body { overflow-x: hidden; }
+        }
+        @media (min-width: 641px) {
+            .xs\:inline { display: inline; }
+            .xs\:hidden { display: none; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
@@ -29,64 +37,65 @@
 <div id="app" v-cloak class="p-4 md:p-6 lg:p-8 max-w-[1700px] mx-auto space-y-6">
 
     <!-- Top Bar Header -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100">
         <div class="flex items-center space-x-3">
-            <div class="p-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-100">
-                <i data-lucide="line-chart" class="w-7 h-7"></i>
+            <div class="p-2.5 md:p-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-100">
+                <i data-lucide="line-chart" class="w-6 h-6 md:w-7 md:h-7"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">智投精算看板</h1>
-                <p class="text-xs text-slate-500">实时追踪场内/场外基金及股票资产 | 自动计算独立年化收益率</p>
+                <h1 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">智投精算看板</h1>
+                <p class="text-[11px] md:text-xs text-slate-500">实时追踪基金及股票资产 | 自动计算年化收益率</p>
             </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2.5">
-            <button @click="fetchLatestPrices" :disabled="isRefreshing" class="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-sm font-semibold transition border border-emerald-200/60 disabled:opacity-50">
-                <i data-lucide="refresh-cw" :class="{'animate-spin': isRefreshing}" class="w-4 h-4"></i>
-                <span>{{ isRefreshing ? '刷新中...' : '一键刷新现价' }}</span>
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-2.5">
+            <button @click="fetchLatestPrices" :disabled="isRefreshing" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 md:px-3.5 py-1.5 md:py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition border border-emerald-200/60 disabled:opacity-50">
+                <i data-lucide="refresh-cw" :class="{'animate-spin': isRefreshing}" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">{{ isRefreshing ? '刷新中...' : '一键刷新现价' }}</span>
+                <span class="md:hidden">刷新</span>
             </button>
-            <button @click="openOffMarketFundModal" class="flex items-center space-x-1.5 px-3.5 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-xl text-sm font-semibold transition border border-amber-200/60">
-                <i data-lucide="pencil" class="w-4 h-4"></i>
-                <span>编辑场外基金价格</span>
+            <button @click="openOffMarketFundModal" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 md:px-3.5 py-1.5 md:py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition border border-amber-200/60">
+                <i data-lucide="pencil" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">编辑场外基金</span>
+                <span class="md:hidden">场外</span>
             </button>
 
-            <button @click="openAiDiagnosis" class="flex items-center space-x-1.5 px-3.5 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl text-sm font-semibold transition border border-purple-200/60">
-                <i data-lucide="sparkles" class="w-4 h-4"></i>
-                <span>AI 投资诊断</span>
+            <button @click="openAiDiagnosis" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 md:px-3.5 py-1.5 md:py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition border border-purple-200/60">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">AI 诊断</span>
+                <span class="md:hidden">AI</span>
             </button>
 
             <!-- 综合股息率按钮：仅在「股票」类别 tab 选中时显示 -->
-            <button v-if="filterType === '股票'" @click="openDividendModal" class="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 hover:from-amber-100 hover:to-orange-100 rounded-xl text-sm font-bold transition border border-amber-300/70 shadow-sm shadow-amber-100">
-                <i data-lucide="coins" class="w-4 h-4"></i>
-                <span>综合股息率 · 年化分红</span>
-                <span v-if="stockDividendSummary.totalAnnualDividend > 0" class="bg-white/80 px-1.5 py-0.5 rounded-lg text-[10px] font-extrabold text-amber-700 font-mono">
+            <button v-if="filterType === '股票'" @click="openDividendModal" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 md:px-3.5 py-1.5 md:py-2 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 hover:from-amber-100 hover:to-orange-100 rounded-lg md:rounded-xl text-[11px] md:text-sm font-bold transition border border-amber-300/70 shadow-sm shadow-amber-100">
+                <i data-lucide="coins" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">综合股息率</span>
+                <span class="md:hidden">股息</span>
+                <span v-if="stockDividendSummary.totalAnnualDividend > 0" class="bg-white/80 px-1.5 py-0.5 rounded-lg text-[10px] font-extrabold text-amber-700 font-mono hidden sm:inline">
                     ¥{{ formatMoney(stockDividendSummary.totalAnnualDividend) }}
                 </span>
             </button>
 
-            <button @click="openModal()" class="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-100 transition">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                <span>新增交易记账</span>
+            <button @click="openModal()" class="flex items-center space-x-1 sm:space-x-1.5 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold shadow-md shadow-indigo-100 transition">
+                <i data-lucide="plus-circle" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">新增记账</span>
+                <span class="md:hidden">新增</span>
             </button>
 
-            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+            <div class="hidden sm:block h-5 w-px bg-slate-200 mx-0.5"></div>
 
-            <button @click="exportData" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="导出 JSON 数据">
-                <i data-lucide="download" class="w-5 h-5"></i>
+            <button @click="exportData" class="p-1.5 md:p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition hidden sm:inline-flex" title="导出 JSON 数据">
+                <i data-lucide="download" class="w-4 h-5"></i>
             </button>
-            <button @click="openImportModal" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="导入 JSON 数据">
-                <i data-lucide="upload" class="w-5 h-5"></i>
-            </button>
-
-            <button @click="downloadSampleData" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="下载样板数据">
-                <i data-lucide="file-text" class="w-5 h-5"></i>
+            <button @click="openImportModal" class="p-1.5 md:p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition hidden sm:inline-flex" title="导入 JSON 数据">
+                <i data-lucide="upload" class="w-4 h-5"></i>
             </button>
 
-            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+            <div class="hidden sm:block h-5 w-px bg-slate-200 mx-0.5"></div>
 
-            <button @click="openGiteeSyncModal" class="flex items-center space-x-1.5 px-3 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl text-sm font-semibold transition border border-orange-200/60" title="Gitee 云端同步">
-                <i data-lucide="cloud" class="w-4 h-4"></i>
-                <span>Gitee 同步</span>
+            <button @click="openGiteeSyncModal" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 md:px-3 py-1.5 md:py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition border border-orange-200/60 hidden sm:flex" title="Gitee 云端同步">
+                <i data-lucide="cloud" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                <span class="hidden md:inline">Gitee 同步</span>
             </button>
         </div>
     </header>
@@ -184,21 +193,21 @@
         <!-- Filters Left -->
         <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <!-- Asset Category Filter -->
-            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600">
+            <div class="flex bg-slate-100 p-1 rounded-xl text-[11px] sm:text-xs font-medium text-slate-600 overflow-x-auto flex-nowrap sm:flex-wrap">
                 <button v-for="cat in ['全部类别', '场内基金', '场外基金', '股票']" :key="cat"
                         @click="filterType = cat"
                         :class="filterType === cat ? 'bg-white text-indigo-600 font-bold shadow-sm' : 'hover:text-slate-900'"
-                        class="px-3 py-1.5 rounded-lg transition">
+                        class="px-2 sm:px-3 py-1.5 rounded-lg transition whitespace-nowrap">
                     {{ cat }}
                 </button>
             </div>
 
             <!-- Holding Status Filter -->
-            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600">
+            <div class="flex bg-slate-100 p-1 rounded-xl text-[11px] sm:text-xs font-medium text-slate-600 overflow-x-auto flex-nowrap sm:flex-wrap">
                 <button v-for="st in ['全部状态', '持有中', '已卖出']" :key="st"
                         @click="filterStatus = st"
                         :class="filterStatus === st ? 'bg-white text-indigo-600 font-bold shadow-sm' : 'hover:text-slate-900'"
-                        class="px-3 py-1.5 rounded-lg transition">
+                        class="px-2 sm:px-3 py-1.5 rounded-lg transition whitespace-nowrap">
                     {{ st }}
                 </button>
             </div>
@@ -219,25 +228,25 @@
     <!-- Main Investment Data Table -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse min-w-[1350px]">
+            <table class="w-full text-left border-collapse min-w-[950px] sm:min-w-[1100px] lg:min-w-[1350px]">
                 <thead>
-                    <tr class="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-xs font-semibold tracking-wider">
-                        <th class="p-4 pl-6 min-w-[170px]">代码 / 名称 / 类别</th>
-                        <th class="p-4 min-w-[120px]">买入日期</th>
-                        <th class="p-4 text-right min-w-[110px]">买入净值</th>
-                        <th class="p-4 text-right min-w-[120px]">投入本金 (元)</th>
-                        <th class="p-4 text-right min-w-[90px]">手续费</th>
-                        <th class="p-4 text-right min-w-[110px]">持有份额</th>
-                        <th class="p-4 text-right min-w-[100px]">最新价</th>
-                        <th class="p-4 text-right min-w-[100px]">卖出价</th>
-                        <th class="p-4 text-center">持有天数</th>
-                        <th class="p-4 text-right">收益率 (%)</th>
-                        <th class="p-4 text-right">独立实际年化</th>
-                        <th v-if="filterType === '股票'" class="p-4 text-right min-w-[130px]">股息率 / 年化分红</th>
-                        <th class="p-4 text-right">获利金额 (元)</th>
-                        <th class="p-4 text-center min-w-[100px]">状态</th>
-                        <th class="p-4 text-right min-w-[110px]">计划加仓</th>
-                        <th class="p-4 text-right min-w-[110px]">清仓后涨跌幅</th>
+                    <tr class="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] sm:text-xs font-semibold tracking-wider">
+                        <th class="px-2 py-3 sm:p-4 sm:pl-6 min-w-[140px] sm:min-w-[170px]">代码 / 名称 / 类别</th>
+                        <th class="px-2 py-3 sm:p-4 min-w-[100px] sm:min-w-[120px]">买入日期</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[80px] sm:min-w-[110px]">买入净值</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[120px]">投入本金</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[70px] sm:min-w-[90px]">手续费</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[110px]">持有份额</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[80px] sm:min-w-[100px]">最新价</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[80px] sm:min-w-[100px]">卖出价</th>
+                        <th class="px-2 py-3 sm:p-4 text-center">持有天数</th>
+                        <th class="px-2 py-3 sm:p-4 text-right">收益率</th>
+                        <th class="px-2 py-3 sm:p-4 text-right">独立年化</th>
+                        <th v-if="filterType === '股票'" class="px-2 py-3 sm:p-4 text-right min-w-[110px] sm:min-w-[130px]">股息率</th>
+                        <th class="px-2 py-3 sm:p-4 text-right">获利金额</th>
+                        <th class="px-2 py-3 sm:p-4 text-center min-w-[80px] sm:min-w-[100px]">状态</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[110px]">计划加仓</th>
+                        <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[110px]">清仓后涨跌</th>
                         <th class="p-4 pr-6 text-center min-w-[120px]">操作</th>
                     </tr>
                 </thead>

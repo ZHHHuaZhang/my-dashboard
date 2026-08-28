@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人资金统计与对比报表系统</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                        },
+                        // Category colors
+                        catCash: '#0284c7',        // 现金 (Blue Sky)
+                        catLiquid: '#0d9488',      // 活期 (Teal)
+                        catStable: '#16a34a',      // 稳健 (Green)
+                        catGrowth: '#e11d48',      // 进攻 (Rose)
+                        catDividend: '#d97706',    // 红利 (Amber)
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo & App Name -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-chart-pie text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg text-slate-900 leading-tight">个人资金统计与健康对比系统</h1>
+                        <p class="text-xs text-slate-500">周期性资产跟踪 & 组合健康诊断</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="hidden md:flex space-x-8 text-sm font-medium">
+                    <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="py-5 px-1 tab-active transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-gauge-high"></i><span>概览与看板</span>
+                    </button>
+                    <button onclick="switchTab('compare')" id="tab-btn-compare" class="py-5 px-1 text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-code-compare"></i><span>周期对比报表</span>
+                    </button>
+                    <button onclick="switchTab('entry')" id="tab-btn-entry" class="py-5 px-1 text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-pen-to-square"></i><span>资金录入与记录</span>
+                    </button>
+                </nav>
+
+                <!-- Quick Actions -->
+                <div class="flex items-center space-x-3">
+                    <button onclick="openGiteeSyncModal()" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs sm:text-sm font-medium px-3.5 py-2 rounded-lg shadow-sm transition flex items-center space-x-1.5" title="Gitee 云端同步">
+                        <i class="fa-solid fa-cloud"></i>
+                        <span class="hidden sm:inline">Gitee 同步</span>
+                    </button>
+                    <button onclick="openNewRecordModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3.5 py-2 rounded-lg shadow-sm transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>录入新资金</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Bar -->
+        <div class="md:hidden border-t border-slate-200 bg-white flex justify-around text-xs text-slate-600">
+            <button onclick="switchTab('dashboard')" id="m-tab-dashboard" class="py-2.5 px-2 text-blue-600 font-semibold flex flex-col items-center">
+                <i class="fa-solid fa-gauge-high text-base mb-0.5"></i>概览
+            </button>
+            <button onclick="switchTab('compare')" id="m-tab-compare" class="py-2.5 px-2 flex flex-col items-center">
+                <i class="fa-solid fa-code-compare text-base mb-0.5"></i>对比报表
+            </button>
+            <button onclick="switchTab('entry')" id="m-tab-entry" class="py-2.5 px-2 flex flex-col items-center">
+                <i class="fa-solid fa-pen-to-square text-base mb-0.5"></i>记录
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- Toast Notifications Container -->
+        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+        <!-- SECTION 1: DASHBOARD & OVERVIEW -->
+        <section id="view-dashboard" class="space-y-6">
+            <!-- Top Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Total Assets Card -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">净资产（总资产-借贷）</p>
+                            <h2 id="dash-total-asset" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">￥0.00</h2>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                            <i class="fa-solid fa-wallet text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 space-y-1">
+                        <div class="flex justify-between text-xs text-slate-500">
+                            <span>总资产</span><span id="dash-gross-asset" class="font-medium text-slate-700">￥0.00</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-rose-500">
+                            <span>借贷已用</span><span id="dash-borrow-used" class="font-medium">-￥0.00</span>
+                        </div>
+                        <div class="flex items-center text-xs text-slate-500 pt-1 border-t border-slate-100">
+                            <span id="dash-asset-growth-badge" class="font-medium inline-flex items-center px-2 py-0.5 rounded mr-2">--</span>
+                            <span id="dash-asset-growth-desc">对比上期变化</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Latest Record Date Card -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">最新录入节点</p>
+                            <h2 id="dash-latest-date" class="text-xl font-bold text-slate-800 mt-2">暂无记录</h2>
+                        </div>
+                        <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                            <i class="fa-solid fa-calendar-check text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-500">
+                        历史已记录 <span id="dash-record-count" class="font-bold text-slate-700">0</span> 次资金状态
+                    </div>
+                </div>
+
+                <!-- Growth Rate Card -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">累计复利增幅</p>
+                            <h2 id="dash-total-growth-rate" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">0.00%</h2>
+                        </div>
+                        <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                            <i class="fa-solid fa-arrow-trend-up text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-500">
+                        基于最早期录入基数对比
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asset Modules Summary Pill Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div class="bg-white p-3.5 rounded-xl border-l-4 border-sky-500 shadow-sm border-t border-r border-b border-slate-200/60">
+                    <div class="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>现金资金</span> <i class="fa-solid fa-money-bill-wave text-sky-500"></i>
+                    </div>
+                    <div class="text-base font-bold text-slate-900 mt-1" id="dash-cat-cash">￥0.00</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5" id="dash-cat-cash-pct">占比 0%</div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-xl border-l-4 border-teal-500 shadow-sm border-t border-r border-b border-slate-200/60">
+                    <div class="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>活期资金</span> <i class="fa-solid fa-piggy-bank text-teal-500"></i>
+                    </div>
+                    <div class="text-base font-bold text-slate-900 mt-1" id="dash-cat-liquid">￥0.00</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5" id="dash-cat-liquid-pct">占比 0%</div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-xl border-l-4 border-emerald-500 shadow-sm border-t border-r border-b border-slate-200/60">
+                    <div class="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>稳健资金</span> <i class="fa-solid fa-vault text-emerald-500"></i>
+                    </div>
+                    <div class="text-base font-bold text-slate-900 mt-1" id="dash-cat-stable">￥0.00</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5" id="dash-cat-stable-pct">占比 0%</div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-xl border-l-4 border-rose-500 shadow-sm border-t border-r border-b border-slate-200/60">
+                    <div class="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>进攻资金</span> <i class="fa-solid fa-rocket text-rose-500"></i>
+                    </div>
+                    <div class="text-base font-bold text-slate-900 mt-1" id="dash-cat-growth">￥0.00</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5" id="dash-cat-growth-pct">占比 0%</div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-xl border-l-4 border-amber-500 shadow-sm border-t border-r border-b border-slate-200/60 col-span-2 sm:col-span-1">
+                    <div class="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>红利资金</span> <i class="fa-solid fa-hand-holding-dollar text-amber-500"></i>
+                    </div>
+                    <div class="text-base font-bold text-slate-900 mt-1" id="dash-cat-dividend">￥0.00</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5" id="dash-cat-dividend-pct">占比 0%</div>
+                </div>
+            </div>
+
+            <!-- Visual Charts Container -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Main Trend Line Chart -->
+                <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">资金稳步增长历史趋势图</h3>
+                            <p class="text-xs text-slate-500">记录不同时间节点的各分类与总额演变</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <select id="trend-chart-mode" onchange="renderTrendChart()" class="text-xs bg-slate-100 border-none rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                                <option value="total">显示：总资产趋势</option>
+                                <option value="stacked">显示：各类资金堆叠图</option>
+                                <option value="separate">显示：各模块平铺趋势</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="h-72 relative">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Asset Allocation Doughnut Chart -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-base font-bold text-slate-900">最新资金分类分布结构</h3>
+                        <p class="text-xs text-slate-500">各类模块占总资金比例分析</p>
+                    </div>
+                    <div class="h-56 relative flex-1 flex items-center justify-center">
+                        <canvas id="allocationChart"></canvas>
+                    </div>
+                    <div id="allocation-legend" class="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1">
+                        <!-- Legend inserted programmatically -->
+                    </div>
+                </div>
+            </div>
+
+            
+        </section>
+
+        <!-- SECTION 2: PERIODIC COMPARISON REPORT (资金对比报表) -->
+        <section id="view-compare" class="space-y-6 hidden">
+            <!-- Controls Bar for Selecting Snapshots -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                <h3 class="text-base font-bold text-slate-900 mb-1">周期资金对比分析</h3>
+                <p class="text-xs text-slate-500 mb-4">自由选择任意两个历史时间节点，对比资金增减幅度与分类结构变化</p>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                    <!-- Date A (Baseline) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">基准节点 (前期/旧节点)</label>
+                        <select id="compare-select-a" onchange="updateCompareReport()" class="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-slate-50 p-2">
+                            <!-- Options populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Compare Icon -->
+                    <div class="hidden md:flex justify-center items-center pb-2 text-slate-400">
+                        <i class="fa-solid fa-arrow-right text-lg"></i>
+                    </div>
+
+                    <!-- Date B (Target) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">对比节点 (近期/新节点)</label>
+                        <select id="compare-select-b" onchange="updateCompareReport()" class="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-slate-50 p-2">
+                            <!-- Options populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Preset Shortcut Quick Buttons -->
+                    <div class="md:col-span-2 flex items-center space-x-2">
+                        <button onclick="setComparePreset('latestTwo')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition">
+                            对比最近两期
+                        </button>
+                        <button onclick="setComparePreset('firstLast')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition">
+                            首尾全周期对比
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Summary Scorecard -->
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400">总资产变化量</p>
+                    <div id="compare-diff-amount" class="text-2xl font-extrabold text-slate-900 mt-1">￥0.00</div>
+                    <div id="compare-diff-pct" class="text-xs mt-1 font-medium">0.00%</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400">净资产变化量</p>
+                    <div id="compare-net-diff" class="text-2xl font-extrabold text-blue-600 mt-1">￥0.00</div>
+                    <div id="compare-net-pct" class="text-xs mt-1 font-medium">0.00%</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400">时间间隔天数</p>
+                    <div id="compare-days-span" class="text-2xl font-extrabold text-slate-800 mt-1">0 天</div>
+                    <div id="compare-annualized" class="text-xs text-slate-500 mt-1">年化增长率预估: 0.0%</div>
+                </div>
+                
+            </div>
+
+            <!-- Comparison Breakdown Detailed Table & Bar Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Comparison Table -->
+                <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h4 class="font-bold text-sm text-slate-800">各类目对比明细表</h4>
+                        <span class="text-xs text-slate-400">按资金模块分解</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4">资金模块</th>
+                                    <th class="py-3 px-3 text-right" id="th-date-a">基准节点</th>
+                                    <th class="py-3 px-3 text-right" id="th-date-b">对比节点</th>
+                                    <th class="py-3 px-3 text-right">变动金额</th>
+                                    <th class="py-3 px-3 text-right">增减幅</th>
+                                    <th class="py-3 px-4 text-center">占比偏移</th>
+                                </tr>
+                            </thead>
+                            <tbody id="compare-table-body" class="divide-y divide-slate-100 font-medium">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Comparison Bar Chart -->
+                <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-800 mb-1">模块变动柱状对比图</h4>
+                        <p class="text-xs text-slate-500 mb-3">直观显示各模块数额浮动</p>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="compareBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: DATA ENTRY & HISTORICAL SNAPSHOTS (资金录入与记录) -->
+        <section id="view-entry" class="space-y-6 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">资金记录管理中心</h3>
+                    <p class="text-xs text-slate-500">定期录入您的资产数据，保存历史快照以便进行趋势跟踪</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="loadSampleData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3 py-2 rounded-lg transition flex items-center space-x-1">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-500"></i>
+                        <span>载入演示示例数据</span>
+                    </button>
+                    <button onclick="openNewRecordModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow-sm flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>新增快照记录</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- History Records Table -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h4 class="font-bold text-sm text-slate-800">历史录入时间轴</h4>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="exportDataJSON()" class="text-xs text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-md shadow-2xs">
+                            <i class="fa-solid fa-download mr-1"></i>导出JSON
+                        </button>
+                        <label class="text-xs text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-md shadow-2xs cursor-pointer">
+                            <i class="fa-solid fa-upload mr-1"></i>导入JSON
+                            <input type="file" id="import-json-file" accept=".json" onchange="importDataJSON(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-100/80 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">录入时间</th>
+                                <th class="py-3 px-3 text-right">现金资金</th>
+                                <th class="py-3 px-3 text-right">活期资金</th>
+                                <th class="py-3 px-3 text-right">稳健资金</th>
+                                <th class="py-3 px-3 text-right">进攻资金</th>
+                                <th class="py-3 px-3 text-right">红利资金</th>
+                                <th class="py-3 px-4 text-right text-rose-600">负债</th>
+                                <th class="py-3 px-4 text-right font-bold">总资产</th>
+                                <th class="py-3 px-4 text-right font-bold text-blue-700">净资产</th>
+                                <th class="py-3 px-4">备注说明</th>
+                                <th class="py-3 px-4 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-table-body" class="divide-y divide-slate-100 font-medium">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        
+
+    </main>
+
+    <!-- GITEE SYNC MODAL -->
+    <div id="gitee-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-cloud text-orange-500"></i>
+                    <h3 class="font-bold text-slate-900 text-base">Gitee 云端同步</h3>
+                </div>
+                <button onclick="closeGiteeSyncModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 mt-4">
+                <p class="text-xs text-slate-500">基于 Gitee OpenAPI，将您的资金数据安全同步到私人仓库。</p>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Gitee 个人令牌</label>
+                        <input type="password" id="gitee-token" placeholder="在Gitee设置中生成的Token" 
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none font-mono">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
+                            <input type="text" id="gitee-user" placeholder="Gitee用户名" 
+                                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仓库名</label>
+                            <input type="text" id="gitee-repo" placeholder="私人仓库名" 
+                                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="gitee-status" class="text-xs p-3 rounded-xl hidden"></div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <a href="https://gitee.com/profile/personal_access_tokens" target="_blank" class="text-[11px] text-slate-500 hover:text-orange-600">
+                        <i class="fa-solid fa-external-link-alt mr-1"></i>前往获取令牌
+                    </a>
+                    <div class="flex space-x-2">
+                        <button onclick="downloadFromGitee()" id="gitee-download-btn" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                            <i class="fa-solid fa-download mr-1"></i>从云端恢复
+                        </button>
+                        <button onclick="uploadToGitee()" id="gitee-upload-btn" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold shadow-md disabled:opacity-50">
+                            <i class="fa-solid fa-upload mr-1"></i>备份到云端
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECORD MODAL DIALOG (WITH SUB-ITEMS) -->
+    <div id="record-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-100 transform transition-all max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 sticky top-0 bg-white z-10">
+                <h3 id="modal-title" class="font-bold text-slate-900 text-base">录入新的资金快照</h3>
+                <button onclick="closeRecordModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="record-form" onsubmit="handleRecordSubmit(event)" class="space-y-4 mt-4">
+                <input type="hidden" id="record-id">
+
+                <!-- Date + Note -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">录入日期 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="record-date" required class="w-full text-sm border-slate-300 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-blue-500 focus:bg-white">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">备注说明 (可选)</label>
+                        <input type="text" id="record-note" placeholder="如：发工资后盘点、季度再平衡、年终奖注入..." class="w-full text-sm border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- Category Sub-items Accordion -->
+                <div class="space-y-2">
+                    <!-- CASH -->
+                    <div class="border border-sky-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-sky-50 cursor-pointer" onclick="toggleSubItemSection('cash-section')">
+                            <span class="text-sm font-bold text-sky-800"><i class="fa-solid fa-money-bill-wave text-sky-500 mr-2"></i>现金资金 (银行活期+现金)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="cash-subtotal" class="text-sm font-extrabold text-sky-700">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-sky-400 text-xs transition-transform" id="cash-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="cash-section" class="border-t border-sky-200 bg-white">
+                            <div id="cash-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('cash')" class="w-full text-xs text-sky-600 hover:text-sky-800 font-medium py-1.5 border border-dashed border-sky-300 rounded-lg hover:bg-sky-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LIQUID -->
+                    <div class="border border-teal-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-teal-50 cursor-pointer" onclick="toggleSubItemSection('liquid-section')">
+                            <span class="text-sm font-bold text-teal-800"><i class="fa-solid fa-piggy-bank text-teal-500 mr-2"></i>活期资金 (货币基金/余额宝)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="liquid-subtotal" class="text-sm font-extrabold text-teal-700">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-teal-400 text-xs transition-transform" id="liquid-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="liquid-section" class="border-t border-teal-200 bg-white">
+                            <div id="liquid-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('liquid')" class="w-full text-xs text-teal-600 hover:text-teal-800 font-medium py-1.5 border border-dashed border-teal-300 rounded-lg hover:bg-teal-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STABLE -->
+                    <div class="border border-emerald-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-emerald-50 cursor-pointer" onclick="toggleSubItemSection('stable-section')">
+                            <span class="text-sm font-bold text-emerald-800"><i class="fa-solid fa-vault text-emerald-500 mr-2"></i>稳健资金 (债券/定期/固收)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="stable-subtotal" class="text-sm font-extrabold text-emerald-700">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-emerald-400 text-xs transition-transform" id="stable-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="stable-section" class="border-t border-emerald-200 bg-white">
+                            <div id="stable-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('stable')" class="w-full text-xs text-emerald-600 hover:text-emerald-800 font-medium py-1.5 border border-dashed border-emerald-300 rounded-lg hover:bg-emerald-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GROWTH -->
+                    <div class="border border-rose-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-rose-50 cursor-pointer" onclick="toggleSubItemSection('growth-section')">
+                            <span class="text-sm font-bold text-rose-800"><i class="fa-solid fa-rocket text-rose-500 mr-2"></i>进攻资金 (股票基金/股票)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="growth-subtotal" class="text-sm font-extrabold text-rose-700">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-rose-400 text-xs transition-transform" id="growth-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="growth-section" class="border-t border-rose-200 bg-white">
+                            <div id="growth-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('growth')" class="w-full text-xs text-rose-600 hover:text-rose-800 font-medium py-1.5 border border-dashed border-rose-300 rounded-lg hover:bg-rose-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DIVIDEND -->
+                    <div class="border border-amber-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-amber-50 cursor-pointer" onclick="toggleSubItemSection('dividend-section')">
+                            <span class="text-sm font-bold text-amber-800"><i class="fa-solid fa-hand-holding-dollar text-amber-500 mr-2"></i>红利资金 (分红基金/红利股票)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="dividend-subtotal" class="text-sm font-extrabold text-amber-700">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-amber-400 text-xs transition-transform" id="dividend-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="dividend-section" class="border-t border-amber-200 bg-white">
+                            <div id="dividend-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('dividend')" class="w-full text-xs text-amber-600 hover:text-amber-800 font-medium py-1.5 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LIABILITIES (负债资金) -->
+                    <div class="border border-rose-300 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-3 bg-rose-100 cursor-pointer" onclick="toggleSubItemSection('liability-section')">
+                            <span class="text-sm font-bold text-rose-700"><i class="fa-solid fa-credit-card text-rose-500 mr-2"></i>负债资金 (信用卡/花呗/借贷已用)</span>
+                            <div class="flex items-center space-x-3">
+                                <span id="liability-subtotal" class="text-sm font-extrabold text-rose-600">￥0.00</span>
+                                <i class="fa-solid fa-chevron-down text-rose-400 text-xs transition-transform" id="liability-section-icon"></i>
+                            </div>
+                        </div>
+                        <div id="liability-section" class="border-t border-rose-200 bg-white">
+                            <div id="liability-items-container" class="p-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+                            <div class="p-2 pt-0">
+                                <button type="button" onclick="addSubItem('liability')" class="w-full text-xs text-rose-500 hover:text-rose-700 font-medium py-1.5 border border-dashed border-rose-300 rounded-lg hover:bg-rose-50 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i>添加负债子项
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calculated Live Total -->
+                <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 space-y-1.5 text-xs">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-600">总资产：</span>
+                        <span id="modal-calculated-total" class="font-extrabold text-base text-blue-700">￥0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-rose-500">负债合计：</span>
+                        <span id="modal-calculated-liability" class="font-bold text-rose-600">-￥0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-1 border-t border-blue-200">
+                        <span class="font-bold text-blue-900">净资产：</span>
+                        <span id="modal-calculated-net" class="font-extrabold text-base text-blue-700">￥0.00</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeRecordModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200">取消</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 shadow-sm">保存快照</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY_RECORDS = 'fund_tracker_records_v1';
+        const STORAGE_KEY_GITEE = 'fund_tracker_gitee_config';
+
+        // Core State
+        let records = [];
+
+        // Gitee Config State
+        let giteeConfig = {
+            token: '',
+            user: '',
+            repo: 'my-portfolio-data'
+        };
+
+        // Temporary sub-items state for modal editing
+        let tempSubItems = {};
+
+        // Chart instances
+        let trendChartInstance = null;
+        let allocationChartInstance = null;
+        let compareBarChartInstance = null;
+
+        window.onload = function() {
+            loadStoredData();
+            if (records.length === 0) {
+                // Pre-fill with realistic sample historical records if first run
+                loadSampleData(false);
+            }
+
+            // Set default date to today in modal
+            document.getElementById('record-date').value = new Date().toISOString().split('T')[0];
+
+            renderAll();
+        };
+
+        function loadStoredData() {
+            try {
+                const recData = localStorage.getItem(STORAGE_KEY_RECORDS);
+                if (recData) records = JSON.parse(recData);
+
+                const giteeRaw = localStorage.getItem(STORAGE_KEY_GITEE);
+                if (giteeRaw) {
+                    try {
+                        giteeConfig = { ...giteeConfig, ...JSON.parse(giteeRaw) };
+                    } catch (e) { console.error('Failed to load Gitee config:', e); }
+                }
+
+            } catch(e) {
+                console.error("Localstorage parsing error:", e);
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+            localStorage.setItem(STORAGE_KEY_GITEE, JSON.stringify(giteeConfig));
+        }
+
+        // ===================== GITEE SYNC FUNCTIONS =====================
+        function openGiteeSyncModal() {
+            document.getElementById('gitee-token').value = giteeConfig.token;
+            document.getElementById('gitee-user').value = giteeConfig.user;
+            document.getElementById('gitee-repo').value = giteeConfig.repo;
+            document.getElementById('gitee-status').classList.add('hidden');
+            document.getElementById('gitee-modal').classList.remove('hidden');
+        }
+
+        function closeGiteeSyncModal() {
+            document.getElementById('gitee-modal').classList.add('hidden');
+        }
+
+        function setGiteeStatus(msg, type) {
+            const el = document.getElementById('gitee-status');
+            el.classList.remove('hidden');
+            el.textContent = msg;
+            el.className = 'text-xs p-3 rounded-xl';
+            if (type === 'success') {
+                el.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-100');
+            } else if (type === 'error') {
+                el.classList.add('bg-rose-50', 'text-rose-700', 'border', 'border-rose-100');
+            } else if (type === 'warning') {
+                el.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-100');
+            } else {
+                el.classList.add('bg-slate-50', 'text-slate-600');
+            }
+            setTimeout(() => { el.classList.add('hidden'); }, 5000);
+        }
+
+        function setGiteeButtons(disabled) {
+            document.getElementById('gitee-upload-btn').disabled = disabled;
+            document.getElementById('gitee-download-btn').disabled = disabled;
+        }
+
+        async function getGiteeFileInfo(token, user, repo, path) {
+            const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}?access_token=${token}`;
+            const res = await fetch(url);
+            if (res.status === 200) return await res.json();
+            return null;
+        }
+
+        async function uploadToGitee() {
+            const token = document.getElementById('gitee-token').value.trim();
+            const user = document.getElementById('gitee-user').value.trim();
+            const repo = document.getElementById('gitee-repo').value.trim();
+
+            if (!token || !user || !repo) {
+                setGiteeStatus('请填写完整的Gitee配置信息！', 'warning');
+                return;
+            }
+
+            giteeConfig = { token, user, repo };
+            saveData();
+
+            setGiteeButtons(true);
+            setGiteeStatus('正在同步备份到Gitee云端...', 'info');
+
+            try {
+                const path = 'fund_tracker_data.json';
+                const payload = { records };
+                const contentStr = JSON.stringify(payload, null, 2);
+                const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+
+                const fileInfo = await getGiteeFileInfo(token, user, repo, path);
+                const method = fileInfo && fileInfo.sha ? 'PUT' : 'POST';
+
+                const bodyData = {
+                    access_token: token,
+                    content: base64Content,
+                    message: "Backup fund tracker data from Personal Finances Dashboard",
+                    sha: fileInfo?.sha
+                };
+
+                const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}`;
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+
+                if (response.ok) {
+                    const now = new Date();
+                    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                    setGiteeStatus(`备份成功 (${timeStr})`, 'success');
+                } else {
+                    const err = await response.json();
+                    setGiteeStatus('备份失败: ' + (err.message || '请求异常'), 'error');
+                }
+            } catch (error) {
+                console.error('Gitee上传失败:', error);
+                setGiteeStatus('连接Gitee失败，请检查网络和配置', 'error');
+            } finally {
+                setGiteeButtons(false);
+            }
+        }
+
+        async function downloadFromGitee() {
+            const token = document.getElementById('gitee-token').value.trim();
+            const user = document.getElementById('gitee-user').value.trim();
+            const repo = document.getElementById('gitee-repo').value.trim();
+
+            if (!token || !user || !repo) {
+                setGiteeStatus('请填写完整的Gitee配置信息！', 'warning');
+                return;
+            }
+
+            if (!confirm('从云端恢复将覆盖当前所有数据，确定继续吗？')) return;
+
+            giteeConfig = { token, user, repo };
+            saveData();
+
+            setGiteeButtons(true);
+            setGiteeStatus('正在从Gitee恢复数据...', 'info');
+
+            try {
+                const fileInfo = await getGiteeFileInfo(token, user, repo, 'fund_tracker_data.json');
+                if (fileInfo && fileInfo.content) {
+                    const rawBin = atob(fileInfo.content);
+                    const decodedStr = decodeURIComponent(Array.prototype.map.call(rawBin, c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+                    
+                    const cloudData = JSON.parse(decodedStr);
+                    if (cloudData.records && Array.isArray(cloudData.records)) {
+                        records = cloudData.records;
+                        saveData();
+                        renderAll();
+                        setGiteeStatus('数据恢复成功！', 'success');
+                    } else {
+                        setGiteeStatus('云端数据格式异常', 'error');
+                    }
+                } else {
+                    setGiteeStatus('云端未找到同步文件', 'warning');
+                }
+            } catch (error) {
+                console.error('Gitee下载失败:', error);
+                setGiteeStatus('获取数据失败，请检查配置', 'error');
+            } finally {
+                setGiteeButtons(false);
+            }
+        }
+
+        function loadSampleData(showToast = true) {
+            records = [
+                { id: '1', date: '2025-06-30', cash: 15000, cashItems: [{id:'c1',name:'工商银行活期',amount:8000},{id:'c2',name:'现金',amount:7000}], liquid: 30000, liquidItems: [{id:'l1',name:'余额宝',amount:18000},{id:'l2',name:'微信零钱通',amount:12000}], stable: 80000, stableItems: [{id:'s1',name:'招商银行定期',amount:50000},{id:'s2',name:'国债',amount:30000}], growth: 50000, growthItems: [{id:'g1',name:'沪深300ETF',amount:30000},{id:'g2',name:'创业板ETF',amount:20000}], dividend: 25000, dividendItems: [{id:'d1',name:'中证红利ETF',amount:15000},{id:'d2',name:'银行股',amount:10000}], liability: 8000, liabilityItems: [{id:'lb1',name:'招商银行信用卡',amount:5000},{id:'lb2',name:'花呗',amount:3000}], note: '2025年中资金结余盘点' },
+                { id: '2', date: '2025-09-30', cash: 18000, cashItems: [{id:'c3',name:'工商银行活期',amount:10000},{id:'c4',name:'现金',amount:8000}], liquid: 32000, liquidItems: [{id:'l3',name:'余额宝',amount:20000},{id:'l4',name:'招招宝',amount:12000}], stable: 85000, stableItems: [{id:'s3',name:'定期存款',amount:55000},{id:'s4',name:'债券基金',amount:30000}], growth: 58000, growthItems: [{id:'g3',name:'沪深300ETF',amount:35000},{id:'g4',name:'纳指ETF',amount:23000}], dividend: 28000, dividendItems: [{id:'d3',name:'中证红利ETF',amount:18000},{id:'d4',name:'REITs',amount:10000}], liability: 12000, liabilityItems: [{id:'lb3',name:'招商银行信用卡',amount:8000},{id:'lb4',name:'美团月付',amount:4000}], note: '三季度固收与红利追加' },
+                { id: '3', date: '2025-12-31', cash: 22000, cashItems: [{id:'c5',name:'工商银行活期',amount:12000},{id:'c6',name:'现金',amount:10000}], liquid: 35000, liquidItems: [{id:'l5',name:'余额宝',amount:22000},{id:'l6',name:'招招宝',amount:13000}], stable: 92000, stableItems: [{id:'s5',name:'定期存款',amount:60000},{id:'s6',name:'债券基金',amount:32000}], growth: 62000, growthItems: [{id:'g5',name:'沪深300ETF',amount:38000},{id:'g6',name:'纳指ETF',amount:24000}], dividend: 32000, dividendItems: [{id:'d5',name:'中证红利ETF',amount:20000},{id:'d6',name:'银行股',amount:12000}], liability: 5000, liabilityItems: [{id:'lb5',name:'花呗',amount:5000}], note: '年终盘点与奖金划拨' },
+                { id: '4', date: '2026-03-31', cash: 20000, cashItems: [{id:'c7',name:'工商银行活期',amount:11000},{id:'c8',name:'现金',amount:9000}], liquid: 38000, liquidItems: [{id:'l7',name:'余额宝',amount:24000},{id:'l8',name:'招招宝',amount:14000}], stable: 100000, stableItems: [{id:'s7',name:'定期存款',amount:65000},{id:'s8',name:'债券基金',amount:35000}], growth: 70000, growthItems: [{id:'g7',name:'沪深300ETF',amount:42000},{id:'g8',name:'创业板ETF',amount:28000}], dividend: 38000, dividendItems: [{id:'d7',name:'中证红利ETF',amount:23000},{id:'d8',name:'REITs',amount:15000}], liability: 15000, liabilityItems: [{id:'lb7',name:'招商银行信用卡',amount:10000},{id:'lb8',name:'花呗',amount:5000}], note: '一季度逢低定投股票基金' },
+                { id: '5', date: '2026-06-30', cash: 25000, cashItems: [{id:'c9',name:'工商银行活期',amount:14000},{id:'c10',name:'现金',amount:11000}], liquid: 40000, liquidItems: [{id:'l9',name:'余额宝',amount:25000},{id:'l10',name:'招招宝',amount:15000}], stable: 110000, stableItems: [{id:'s9',name:'定期存款',amount:70000},{id:'s10',name:'债券基金',amount:40000}], growth: 78000, growthItems: [{id:'g9',name:'沪深300ETF',amount:46000},{id:'g10',name:'纳指ETF',amount:32000}], dividend: 45000, dividendItems: [{id:'d9',name:'中证红利ETF',amount:27000},{id:'d10',name:'银行股',amount:18000}], liability: 10000, liabilityItems: [{id:'lb9',name:'招商银行信用卡',amount:7000},{id:'lb10',name:'美团月付',amount:3000}], note: '年中复盘：红利资产分红再投资' }
+            ];
+            records.sort((a, b) => new Date(a.date) - new Date(b.date));
+            saveData();
+            renderAll();
+            if (showToast) showToastNotification('已载入演示示例数据！', 'success');
+        }
+
+        function formatCurrency(val) {
+            return '￥' + Number(val || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function calculateRecordTotal(r) {
+            return (r.cash || 0) + (r.liquid || 0) + (r.stable || 0) + (r.growth || 0) + (r.dividend || 0);
+        }
+
+        function getRecordLiabilities(r) {
+            return r.liability || 0;
+        }
+
+        function getTotalBorrowingsUsed() {
+            if (records.length === 0) return 0;
+            const latest = records[records.length - 1];
+            return getRecordLiabilities(latest);
+        }
+
+        function calculateNetAsset(total) {
+            return total - getTotalBorrowingsUsed();
+        }
+
+        function switchTab(tabId) {
+            const tabs = ['dashboard', 'compare', 'entry'];
+            tabs.forEach(t => {
+                const el = document.getElementById(`view-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const mBtn = document.getElementById(`m-tab-${t}`);
+                
+                if (t === tabId) {
+                    el.classList.remove('hidden');
+                    if (btn) {
+                        btn.classList.add('tab-active');
+                        btn.classList.remove('text-slate-500');
+                    }
+                    if (mBtn) {
+                        mBtn.classList.add('text-blue-600', 'font-semibold');
+                        mBtn.classList.remove('text-slate-500');
+                    }
+                } else {
+                    el.classList.add('hidden');
+                    if (btn) {
+                        btn.classList.remove('tab-active');
+                        btn.classList.add('text-slate-500');
+                    }
+                    if (mBtn) {
+                        mBtn.classList.remove('text-blue-600', 'font-semibold');
+                    }
+                }
+            });
+
+            // Re-render specific chart dimensions when switching tab
+            if (tabId === 'dashboard') {
+                renderDashboard();
+            } else if (tabId === 'compare') {
+                populateCompareDropdowns();
+                updateCompareReport();
+            }
+        }
+
+        function renderAll() {
+            renderDashboard();
+            renderRecordsTable();
+            populateCompareDropdowns();
+        }
+
+        function renderDashboard() {
+            if (records.length === 0) {
+                document.getElementById('dash-total-asset').innerText = formatCurrency(0);
+                document.getElementById('dash-latest-date').innerText = '无记录';
+                return;
+            }
+
+            // Ensure records are sorted chronologically
+            records.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const latest = records[records.length - 1];
+            const latestTotal = calculateRecordTotal(latest);
+            const totalBorrowingsUsed = getTotalBorrowingsUsed();
+            const latestNet = latestTotal - totalBorrowingsUsed;
+
+            // Total Asset Card (Net Asset)
+            document.getElementById('dash-total-asset').innerText = formatCurrency(latestNet);
+            document.getElementById('dash-gross-asset').innerText = formatCurrency(latestTotal);
+            document.getElementById('dash-borrow-used').innerText = '-' + formatCurrency(totalBorrowingsUsed);
+            document.getElementById('dash-latest-date').innerText = latest.date;
+            document.getElementById('dash-record-count').innerText = records.length;
+
+            // Growth compared to previous record (based on net asset)
+            if (records.length >= 2) {
+                const prev = records[records.length - 2];
+                const prevTotal = calculateRecordTotal(prev);
+                const prevNet = prevTotal - getRecordLiabilities(prev);
+                const diff = latestNet - prevNet;
+                const pct = prevNet > 0 ? (diff / prevNet) * 100 : 0;
+                
+                const badge = document.getElementById('dash-asset-growth-badge');
+                if (diff >= 0) {
+                    badge.innerText = `+${pct.toFixed(2)}% (+$${diff.toFixed(0)})`.replace('$', '￥');
+                    badge.className = 'font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded mr-2';
+                } else {
+                    badge.innerText = `${pct.toFixed(2)}% (${diff.toFixed(0)})`.replace('$', '￥');
+                    badge.className = 'font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded mr-2';
+                }
+            } else {
+                document.getElementById('dash-asset-growth-badge').innerText = '基准首期';
+                document.getElementById('dash-asset-growth-badge').className = 'font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded mr-2';
+            }
+
+            // Total growth from the very first record (based on net asset)
+            const firstTotal = calculateRecordTotal(records[0]);
+            const firstNet = firstTotal - totalBorrowingsUsed;
+            const totalGrowthPct = firstNet > 0 ? ((latestNet - firstNet) / firstNet) * 100 : 0;
+            document.getElementById('dash-total-growth-rate').innerText = (totalGrowthPct >= 0 ? '+' : '') + totalGrowthPct.toFixed(2) + '%';
+
+            // Category Breakdowns
+            const catMap = [
+                { key: 'cash', elAmount: 'dash-cat-cash', elPct: 'dash-cat-cash-pct' },
+                { key: 'liquid', elAmount: 'dash-cat-liquid', elPct: 'dash-cat-liquid-pct' },
+                { key: 'stable', elAmount: 'dash-cat-stable', elPct: 'dash-cat-stable-pct' },
+                { key: 'growth', elAmount: 'dash-cat-growth', elPct: 'dash-cat-growth-pct' },
+                { key: 'dividend', elAmount: 'dash-cat-dividend', elPct: 'dash-cat-dividend-pct' }
+            ];
+
+            catMap.forEach(item => {
+                const amount = latest[item.key] || 0;
+                const pct = latestTotal > 0 ? (amount / latestTotal) * 100 : 0;
+                document.getElementById(item.elAmount).innerText = formatCurrency(amount);
+                document.getElementById(item.elPct).innerText = `占比 ${pct.toFixed(1)}%`;
+            });
+
+            // Render Charts
+            renderTrendChart();
+            renderAllocationChart(latest);
+        }
+
+        function renderTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const mode = document.getElementById('trend-chart-mode').value;
+
+            const labels = records.map(r => r.date);
+            let datasets = [];
+
+            if (mode === 'total') {
+                datasets = [{
+                    label: '总资产 (￥)',
+                    data: records.map(r => calculateRecordTotal(r)),
+                    borderColor: '#94a3b8',
+                    backgroundColor: 'rgba(148, 163, 184, 0.05)',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }, {
+                    label: '负债 (￥)',
+                    data: records.map(r => getRecordLiabilities(r)),
+                    borderColor: '#e11d48',
+                    backgroundColor: 'rgba(225, 29, 72, 0.05)',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }, {
+                    label: '净资产 (￥)',
+                    data: records.map(r => calculateRecordTotal(r) - getRecordLiabilities(r)),
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }];
+            } else if (mode === 'stacked' || mode === 'separate') {
+                const isStacked = mode === 'stacked';
+                datasets = [
+                    { label: '现金资金', data: records.map(r => r.cash), borderColor: '#0284c7', backgroundColor: 'rgba(2, 132, 199, 0.6)', fill: isStacked, tension: 0.2 },
+                    { label: '活期资金', data: records.map(r => r.liquid), borderColor: '#0d9488', backgroundColor: 'rgba(13, 148, 136, 0.6)', fill: isStacked, tension: 0.2 },
+                    { label: '稳健资金', data: records.map(r => r.stable), borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.6)', fill: isStacked, tension: 0.2 },
+                    { label: '进攻资金', data: records.map(r => r.growth), borderColor: '#e11d48', backgroundColor: 'rgba(225, 29, 72, 0.6)', fill: isStacked, tension: 0.2 },
+                    { label: '红利资金', data: records.map(r => r.dividend), borderColor: '#d97706', backgroundColor: 'rgba(217, 119, 6, 0.6)', fill: isStacked, tension: 0.2 }
+                ];
+            }
+
+            if (trendChartInstance) trendChartInstance.destroy();
+
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ￥${context.raw.toLocaleString()}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: {
+                            stacked: mode === 'stacked',
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                font: { size: 10 },
+                                callback: function(val) { return '￥' + val.toLocaleString(); }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAllocationChart(latestSnapshot) {
+            const ctx = document.getElementById('allocationChart').getContext('2d');
+            const dataVals = [
+                latestSnapshot.cash || 0,
+                latestSnapshot.liquid || 0,
+                latestSnapshot.stable || 0,
+                latestSnapshot.growth || 0,
+                latestSnapshot.dividend || 0
+            ];
+
+            const colors = ['#0284c7', '#0d9488', '#16a34a', '#e11d48', '#d97706'];
+            const labels = ['现金资金', '活期资金', '稳健资金', '进攻资金', '红利资金'];
+
+            if (allocationChartInstance) allocationChartInstance.destroy();
+
+            allocationChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: dataVals,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = dataVals.reduce((a, b) => a + b, 0);
+                                    const pct = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                                    return `${context.label}: ￥${context.raw.toLocaleString()} (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Populate Legend Box
+            const legendBox = document.getElementById('allocation-legend');
+            const total = dataVals.reduce((a,b)=>a+b, 0);
+            legendBox.innerHTML = labels.map((l, idx) => {
+                const pct = total > 0 ? ((dataVals[idx]/total)*100).toFixed(1) : '0.0';
+                return `
+                    <div class="flex justify-between items-center text-slate-600">
+                        <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${colors[idx]}"></span>${l}</span>
+                        <span class="font-semibold text-slate-800">${pct}%</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function populateCompareDropdowns() {
+            const selA = document.getElementById('compare-select-a');
+            const selB = document.getElementById('compare-select-b');
+
+            if (!selA || !selB) return;
+
+            selA.innerHTML = '';
+            selB.innerHTML = '';
+
+            if (records.length === 0) return;
+
+            records.forEach((r, idx) => {
+                const total = calculateRecordTotal(r);
+                const net = total - getTotalBorrowingsUsed();
+                const optA = document.createElement('option');
+                optA.value = r.id;
+                optA.innerText = `${r.date} (净资产: ${formatCurrency(net)})`;
+                selA.appendChild(optA);
+
+                const optB = document.createElement('option');
+                optB.value = r.id;
+                optB.innerText = `${r.date} (净资产: ${formatCurrency(net)})`;
+                selB.appendChild(optB);
+            });
+
+            // Defaults: B = latest, A = second latest or first
+            if (records.length >= 2) {
+                selA.value = records[records.length - 2].id;
+                selB.value = records[records.length - 1].id;
+            } else {
+                selA.value = records[0].id;
+                selB.value = records[0].id;
+            }
+        }
+
+        function setComparePreset(preset) {
+            if (records.length === 0) return;
+            const selA = document.getElementById('compare-select-a');
+            const selB = document.getElementById('compare-select-b');
+
+            if (preset === 'latestTwo') {
+                selA.value = records[Math.max(0, records.length - 2)].id;
+                selB.value = records[records.length - 1].id;
+            } else if (preset === 'firstLast') {
+                selA.value = records[0].id;
+                selB.value = records[records.length - 1].id;
+            }
+            updateCompareReport();
+        }
+
+        function updateCompareReport() {
+            const idA = document.getElementById('compare-select-a').value;
+            const idB = document.getElementById('compare-select-b').value;
+
+            const recA = records.find(r => r.id === idA) || records[0];
+            const recB = records.find(r => r.id === idB) || records[records.length - 1];
+
+            if (!recA || !recB) return;
+
+            const totalA = calculateRecordTotal(recA);
+            const totalB = calculateRecordTotal(recB);
+            const diffAmount = totalB - totalA;
+            const diffPct = totalA > 0 ? (diffAmount / totalA) * 100 : 0;
+
+            // Net asset comparison (per-record liabilities)
+            const netA = totalA - getRecordLiabilities(recA);
+            const netB = totalB - getRecordLiabilities(recB);
+            const netDiff = netB - netA;
+            const netDiffPct = netA > 0 ? (netDiff / netA) * 100 : 0;
+
+            // Summary metrics
+            const diffEl = document.getElementById('compare-diff-amount');
+            const pctEl = document.getElementById('compare-diff-pct');
+
+            diffEl.innerText = (diffAmount >= 0 ? '+' : '') + formatCurrency(diffAmount);
+            diffEl.className = `text-2xl font-extrabold ${diffAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            pctEl.innerText = `${diffAmount >= 0 ? '+' : ''}${diffPct.toFixed(2)}% 相较于 ${recA.date}`;
+
+            const netDiffEl = document.getElementById('compare-net-diff');
+            const netPctEl = document.getElementById('compare-net-pct');
+            netDiffEl.innerText = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
+            netDiffEl.className = `text-2xl font-extrabold ${netDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            netPctEl.innerText = `${netDiff >= 0 ? '+' : ''}${netDiffPct.toFixed(2)}% (总资产-借贷)`;
+            netPctEl.className = `text-xs mt-1 font-medium ${netDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+
+            // Days span & annualized
+            const dateA = new Date(recA.date);
+            const dateB = new Date(recB.date);
+            const daysSpan = Math.max(0, Math.round((dateB - dateA) / (1000 * 60 * 60 * 24)));
+            document.getElementById('compare-days-span').innerText = `${daysSpan} 天`;
+
+            if (daysSpan > 0 && totalA > 0) {
+                const annualizedPct = (Math.pow(totalB / totalA, 365 / daysSpan) - 1) * 100;
+                document.getElementById('compare-annualized').innerText = `年化增长率折算: ${annualizedPct.toFixed(2)}%`;
+            } else {
+                document.getElementById('compare-annualized').innerText = `同期或无天数跨度`;
+            }
+
+            // Table headers update
+            document.getElementById('th-date-a').innerText = recA.date;
+            document.getElementById('th-date-b').innerText = recB.date;
+
+            // Categories Table Build
+            const catMeta = [
+                { key: 'cash', name: '现金资金 (银行活期+现金)', color: 'text-sky-600' },
+                { key: 'liquid', name: '活期资金 (货币基金)', color: 'text-teal-600' },
+                { key: 'stable', name: '稳健资金 (债券/定期)', color: 'text-emerald-600' },
+                { key: 'growth', name: '进攻资金 (股票/股票基金)', color: 'text-rose-600' },
+                { key: 'dividend', name: '红利资金 (分红型基金/股票)', color: 'text-amber-600' },
+                { key: 'liability', name: '负债资金 (借贷已用)', color: 'text-rose-600' }
+            ];
+
+            const tbody = document.getElementById('compare-table-body');
+            tbody.innerHTML = '';
+
+            catMeta.forEach(m => {
+                const valA = recA[m.key] || 0;
+                const valB = recB[m.key] || 0;
+                const cDiff = valB - valA;
+                const cPct = valA > 0 ? (cDiff / valA) * 100 : (valB > 0 ? 100 : 0);
+
+                const shareA = totalA > 0 ? (valA / totalA) * 100 : 0;
+                const shareB = totalB > 0 ? (valB / totalB) * 100 : 0;
+                const shareShift = shareB - shareA;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold ${m.color}">${m.name}</td>
+                    <td class="py-3 px-3 text-right text-slate-600">${formatCurrency(valA)} <span class="text-[10px] text-slate-400">(${shareA.toFixed(1)}%)</span></td>
+                    <td class="py-3 px-3 text-right text-slate-800 font-semibold">${formatCurrency(valB)} <span class="text-[10px] text-slate-400">(${shareB.toFixed(1)}%)</span></td>
+                    <td class="py-3 px-3 text-right font-bold ${cDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${cDiff >= 0 ? '+' : ''}${formatCurrency(cDiff)}
+                    </td>
+                    <td class="py-3 px-3 text-right font-medium ${cDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${cDiff >= 0 ? '+' : ''}${cPct.toFixed(2)}%
+                    </td>
+                    <td class="py-3 px-4 text-center text-xs">
+                        <span class="inline-block px-2 py-0.5 rounded ${shareShift >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                            ${shareShift >= 0 ? '↑' : '↓'} ${Math.abs(shareShift).toFixed(1)}%
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Net asset summary row
+            const netTr = document.createElement('tr');
+            netTr.className = 'border-t-2 border-slate-200 bg-blue-50/50';
+            netTr.innerHTML = `
+                <td class="py-3 px-4 font-bold text-blue-700"><i class="fa-solid fa-coins mr-1"></i>净资产</td>
+                <td class="py-3 px-3 text-right text-blue-700 font-extrabold">${formatCurrency(netA)}</td>
+                <td class="py-3 px-3 text-right text-blue-700 font-extrabold">${formatCurrency(netB)}</td>
+                <td class="py-3 px-3 text-right font-extrabold ${netDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                    ${netDiff >= 0 ? '+' : ''}${formatCurrency(netDiff)}
+                </td>
+                <td class="py-3 px-3 text-right font-bold ${netDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                    ${netDiff >= 0 ? '+' : ''}${netDiffPct.toFixed(2)}%
+                </td>
+                <td class="py-3 px-4 text-center text-xs text-slate-400">--</td>
+            `;
+            tbody.appendChild(netTr);
+
+            // Render Comparison Bar Chart
+            renderCompareBarChart(recA, recB);
+        }
+
+        function renderCompareBarChart(recA, recB) {
+            const ctx = document.getElementById('compareBarChart').getContext('2d');
+
+            const labels = ['现金', '活期', '稳健', '进攻', '红利'];
+            const dataA = [recA.cash, recA.liquid, recA.stable, recA.growth, recA.dividend];
+            const dataB = [recB.cash, recB.liquid, recB.stable, recB.growth, recB.dividend];
+
+            if (compareBarChartInstance) compareBarChartInstance.destroy();
+
+            compareBarChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: recA.date, data: dataA, backgroundColor: 'rgba(148, 163, 184, 0.7)' },
+                        { label: recB.date, data: dataB, backgroundColor: 'rgba(37, 99, 235, 0.85)' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(c) { return `${c.dataset.label}: ￥${c.raw.toLocaleString()}`; }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                font: { size: 10 },
+                                callback: function(val) { return '￥' + val.toLocaleString(); }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderRecordsTable() {
+            const tbody = document.getElementById('records-table-body');
+            tbody.innerHTML = '';
+
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="11" class="py-8 text-center text-slate-400">暂无任何录入记录，点击右上角新增快照</td></tr>`;
+                return;
+            }
+
+            // Reverse order for display (newest first)
+            const displayList = [...records].reverse();
+
+            displayList.forEach(r => {
+                const total = calculateRecordTotal(r);
+                const liability = getRecordLiabilities(r);
+                const net = total - liability;
+                const hasSubItems = ALL_CATEGORIES.some(cat => {
+                    const items = r[cat + 'Items'];
+                    return items && Array.isArray(items) && items.length > 0;
+                });
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors cursor-pointer';
+                tr.onclick = function(e) {
+                    if (e.target.closest('button')) return;
+                    toggleRecordExpand(r.id);
+                };
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
+                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 mr-1.5 transition-transform" id="expand-icon-${r.id}"></i>${r.date}
+                    </td>
+                    <td class="py-3 px-3 text-right text-sky-700">${formatCurrency(r.cash)}</td>
+                    <td class="py-3 px-3 text-right text-teal-700">${formatCurrency(r.liquid)}</td>
+                    <td class="py-3 px-3 text-right text-emerald-700">${formatCurrency(r.stable)}</td>
+                    <td class="py-3 px-3 text-right text-rose-700">${formatCurrency(r.growth)}</td>
+                    <td class="py-3 px-3 text-right text-amber-700">${formatCurrency(r.dividend)}</td>
+                    <td class="py-3 px-4 text-right text-rose-600 font-medium">${liability > 0 ? '-' + formatCurrency(liability) : '￥0.00'}</td>
+                    <td class="py-3 px-4 text-right font-extrabold text-slate-900">${formatCurrency(total)}</td>
+                    <td class="py-3 px-4 text-right font-extrabold text-blue-700">${formatCurrency(net)}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs max-w-xs truncate" title="${r.note || ''}">${r.note || '-'}</td>
+                    <td class="py-3 px-4 text-center whitespace-nowrap">
+                        <button onclick="editRecord('${r.id}')" class="text-blue-600 hover:text-blue-800 mr-1" title="编辑"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="copyRecord('${r.id}')" class="text-emerald-600 hover:text-emerald-800 mr-1" title="复制创建新快照"><i class="fa-regular fa-copy"></i></button>
+                        <button onclick="deleteRecord('${r.id}')" class="text-rose-500 hover:text-rose-700" title="删除"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                // Expanded sub-items row
+                if (hasSubItems) {
+                    const expandTr = document.createElement('tr');
+                    expandTr.id = 'expand-row-' + r.id;
+                    expandTr.className = 'hidden bg-slate-50/70';
+                    expandTr.innerHTML = `
+                        <td colspan="11" class="py-2 px-6">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                                ${renderSubItemsCell(r, 'cash', '现金资金', 'text-sky-600', 'bg-sky-50')}
+                                ${renderSubItemsCell(r, 'liquid', '活期资金', 'text-teal-600', 'bg-teal-50')}
+                                ${renderSubItemsCell(r, 'stable', '稳健资金', 'text-emerald-600', 'bg-emerald-50')}
+                                ${renderSubItemsCell(r, 'growth', '进攻资金', 'text-rose-600', 'bg-rose-50')}
+                                ${renderSubItemsCell(r, 'dividend', '红利资金', 'text-amber-600', 'bg-amber-50')}
+                                ${renderSubItemsCell(r, 'liability', '负债资金', 'text-rose-600', 'bg-rose-50')}
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(expandTr);
+                }
+            });
+        }
+
+        // ===================== SUB-ITEM MANAGEMENT =====================
+        const CATEGORIES = ['cash', 'liquid', 'stable', 'growth', 'dividend'];
+        const ALL_CATEGORIES = ['cash', 'liquid', 'stable', 'growth', 'dividend', 'liability'];
+
+        function renderSubItemsCell(rec, cat, label, titleColor, bgColor) {
+            const items = rec[cat + 'Items'];
+            if (!items || !Array.isArray(items) || items.length === 0) return '';
+            const namedItems = items.filter(i => i.name && i.name.trim());
+            const unnamedAmount = items.filter(i => !i.name || !i.name.trim()).reduce((s, i) => s + (i.amount || 0), 0);
+
+            let html = `<div class="${bgColor} rounded-lg p-2.5 border border-slate-200">`;
+            html += `<div class="font-bold ${titleColor} mb-1.5 text-[11px]">${label} <span class="font-normal text-slate-500">(${formatCurrency(rec[cat])})</span></div>`;
+            if (namedItems.length > 0) {
+                namedItems.forEach(i => {
+                    html += `<div class="flex justify-between text-slate-600 py-0.5"><span>${escapeHtml(i.name)}</span><span class="font-mono font-medium">${formatCurrency(i.amount)}</span></div>`;
+                });
+            }
+            if (unnamedAmount > 0) {
+                html += `<div class="flex justify-between text-slate-400 py-0.5"><span class="italic">未命名</span><span class="font-mono">${formatCurrency(unnamedAmount)}</span></div>`;
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function toggleRecordExpand(recId) {
+            const expandRow = document.getElementById('expand-row-' + recId);
+            const icon = document.getElementById('expand-icon-' + recId);
+            if (!expandRow) return;
+            if (expandRow.classList.contains('hidden')) {
+                expandRow.classList.remove('hidden');
+                if (icon) icon.style.transform = 'rotate(90deg)';
+            } else {
+                expandRow.classList.add('hidden');
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function initTempSubItems() {
+            tempSubItems = {};
+            ALL_CATEGORIES.forEach(cat => { tempSubItems[cat] = []; });
+        }
+
+        function addSubItem(cat) {
+            const item = { id: 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: '', amount: 0 };
+            tempSubItems[cat].push(item);
+            renderSubItems(cat);
+            updateSubtotal(cat);
+            calculateModalTotal();
+        }
+
+        function removeSubItem(cat, itemId) {
+            tempSubItems[cat] = tempSubItems[cat].filter(i => i.id !== itemId);
+            renderSubItems(cat);
+            updateSubtotal(cat);
+            calculateModalTotal();
+        }
+
+        function onSubItemNameChange(cat, itemId, value) {
+            const item = tempSubItems[cat].find(i => i.id === itemId);
+            if (item) { item.name = value; }
+        }
+
+        function onSubItemAmountChange(cat, itemId, value) {
+            const item = tempSubItems[cat].find(i => i.id === itemId);
+            if (item) {
+                item.amount = parseFloat(value) || 0;
+                updateSubtotal(cat);
+                calculateModalTotal();
+            }
+        }
+
+        function getCategoryTotal(cat) {
+            return tempSubItems[cat].reduce((s, i) => s + (i.amount || 0), 0);
+        }
+
+        function updateSubtotal(cat) {
+            const total = getCategoryTotal(cat);
+            document.getElementById(cat + '-subtotal').innerText = formatCurrency(total);
+        }
+
+        function renderSubItems(cat) {
+            const container = document.getElementById(cat + '-items-container');
+            const items = tempSubItems[cat];
+            container.innerHTML = items.map(item => `
+                <div class="flex items-center space-x-2 bg-slate-50 rounded-lg p-2 border border-slate-200">
+                    <input type="text" value="${escapeHtml(item.name)}" 
+                           onchange="onSubItemNameChange('${cat}', '${item.id}', this.value)"
+                           placeholder="名称" 
+                           class="flex-1 text-xs border-slate-300 rounded-md px-2 py-1.5 border focus:ring-2 focus:ring-sky-500 min-w-0">
+                    <div class="relative w-28 flex-shrink-0">
+                        <span class="absolute left-2 top-1.5 text-slate-400 text-xs">￥</span>
+                        <input type="number" step="0.01" min="0" value="${item.amount || ''}" 
+                               onchange="onSubItemAmountChange('${cat}', '${item.id}', this.value)"
+                               placeholder="0.00" 
+                               class="w-full text-xs border-slate-300 rounded-md pl-5 pr-2 py-1.5 border focus:ring-2 focus:ring-sky-500 text-right">
+                    </div>
+                    <button type="button" onclick="removeSubItem('${cat}', '${item.id}')" 
+                            class="text-slate-400 hover:text-rose-500 flex-shrink-0 p-1">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function toggleSubItemSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const icon = document.getElementById(sectionId + '-icon');
+            if (section.classList.contains('hidden')) {
+                section.classList.remove('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                section.classList.add('hidden');
+                icon.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ===================== RECORD MODAL =====================
+        function openNewRecordModal() {
+            document.getElementById('modal-title').innerText = '录入新的资金快照';
+            document.getElementById('record-form').reset();
+            document.getElementById('record-id').value = '';
+            document.getElementById('record-date').value = new Date().toISOString().split('T')[0];
+
+            initTempSubItems();
+            CATEGORIES.forEach(cat => {
+                renderSubItems(cat);
+                updateSubtotal(cat);
+                const section = document.getElementById(cat + '-section');
+                if (section) section.classList.remove('hidden');
+            });
+            // Liability section: initialize but collapse by default
+            renderSubItems('liability');
+            updateSubtotal('liability');
+            const liabilitySection = document.getElementById('liability-section');
+            if (liabilitySection) liabilitySection.classList.add('hidden');
+            calculateModalTotal();
+            document.getElementById('record-modal').classList.remove('hidden');
+        }
+
+        function closeRecordModal() {
+            document.getElementById('record-modal').classList.add('hidden');
+        }
+
+        function calculateModalTotal() {
+            let total = 0;
+            CATEGORIES.forEach(cat => { total += getCategoryTotal(cat); });
+            const liability = getCategoryTotal('liability');
+            const net = total - liability;
+            document.getElementById('modal-calculated-total').innerText = formatCurrency(total);
+            document.getElementById('modal-calculated-liability').innerText = '-' + formatCurrency(liability);
+            document.getElementById('modal-calculated-net').innerText = formatCurrency(net);
+        }
+
+        function editRecord(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            document.getElementById('modal-title').innerText = '编辑资金快照记录';
+            document.getElementById('record-id').value = rec.id;
+            document.getElementById('record-date').value = rec.date;
+            document.getElementById('record-note').value = rec.note || '';
+
+            initTempSubItems();
+            ALL_CATEGORIES.forEach(cat => {
+                const itemsKey = cat + 'Items';
+                const hasItems = rec[itemsKey] && Array.isArray(rec[itemsKey]) && rec[itemsKey].length > 0;
+                if (hasItems) {
+                    tempSubItems[cat] = rec[itemsKey].map(i => ({ ...i }));
+                } else {
+                    const val = rec[cat] || 0;
+                    if (val > 0) {
+                        tempSubItems[cat] = [{ id: 'legacy_' + cat, name: '', amount: val }];
+                    } else {
+                        tempSubItems[cat] = [];
+                    }
+                }
+                renderSubItems(cat);
+                updateSubtotal(cat);
+                const section = document.getElementById(cat + '-section');
+                if (section) {
+                    if (cat === 'liability' && !hasItems && !rec[cat]) {
+                        section.classList.add('hidden');
+                    } else {
+                        section.classList.remove('hidden');
+                    }
+                }
+            });
+
+            calculateModalTotal();
+            document.getElementById('record-modal').classList.remove('hidden');
+        }
+
+        function copyRecord(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            document.getElementById('modal-title').innerText = '复制记录创建新快照';
+            document.getElementById('record-id').value = '';
+            document.getElementById('record-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('record-note').value = rec.note || '';
+
+            initTempSubItems();
+            ALL_CATEGORIES.forEach(cat => {
+                const itemsKey = cat + 'Items';
+                const hasItems = rec[itemsKey] && Array.isArray(rec[itemsKey]) && rec[itemsKey].length > 0;
+                if (hasItems) {
+                    tempSubItems[cat] = rec[itemsKey].map(i => ({ ...i }));
+                } else {
+                    const val = rec[cat] || 0;
+                    if (val > 0) {
+                        tempSubItems[cat] = [{ id: 'legacy_' + cat, name: '', amount: val }];
+                    } else {
+                        tempSubItems[cat] = [];
+                    }
+                }
+                renderSubItems(cat);
+                updateSubtotal(cat);
+                const section = document.getElementById(cat + '-section');
+                if (section) {
+                    if (cat === 'liability' && !hasItems && !rec[cat]) {
+                        section.classList.add('hidden');
+                    } else {
+                        section.classList.remove('hidden');
+                    }
+                }
+            });
+
+            calculateModalTotal();
+            document.getElementById('record-modal').classList.remove('hidden');
+        }
+
+        function handleRecordSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('record-id').value;
+            const date = document.getElementById('record-date').value;
+            const note = document.getElementById('record-note').value.trim();
+
+            // Build record data from sub-items
+            const recData = { id: id || Date.now().toString(), date, note };
+            ALL_CATEGORIES.forEach(cat => {
+                recData[cat] = getCategoryTotal(cat);
+                recData[cat + 'Items'] = tempSubItems[cat].map(i => ({ id: i.id, name: i.name, amount: i.amount }));
+            });
+
+            if (id) {
+                const index = records.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    records[index] = recData;
+                    showToastNotification('资金快照更新成功！', 'success');
+                }
+            } else {
+                const existing = records.find(r => r.date === date);
+                if (existing) {
+                    if (!confirm(`日期 ${date} 已存在资金记录，是否要更新该日期的快照？`)) return;
+                    recData.id = existing.id;
+                    const idx = records.findIndex(r => r.id === existing.id);
+                    if (idx !== -1) records[idx] = recData;
+                } else {
+                    records.push(recData);
+                }
+                showToastNotification('资金快照保存成功！', 'success');
+            }
+
+            records.sort((a, b) => new Date(a.date) - new Date(b.date));
+            saveData();
+            closeRecordModal();
+            renderAll();
+        }
+
+        function deleteRecord(id) {
+            if (!confirm('确定要删除这条资金记录快照吗？')) return;
+            records = records.filter(r => r.id !== id);
+            saveData();
+            renderAll();
+            showToastNotification('记录已删除', 'info');
+        }
+
+        function exportDataJSON() {
+            const dump = {
+                records,
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `个人资金统计备份_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToastNotification('备份文件已下载', 'success');
+        }
+
+        function importDataJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    if (parsed.records && Array.isArray(parsed.records)) {
+                        records = parsed.records;
+                        saveData();
+                        renderAll();
+                        showToastNotification('数据成功导入！', 'success');
+                    } else {
+                        showToastNotification('文件格式不匹配，无法读取记录', 'error');
+                    }
+                } catch(err) {
+                    showToastNotification('JSON 文件解析失败', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showToastNotification(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bg = 'bg-slate-800 text-white';
+            let icon = 'fa-circle-info';
+            if (type === 'success') { bg = 'bg-emerald-600 text-white'; icon = 'fa-circle-check'; }
+            if (type === 'error') { bg = 'bg-rose-600 text-white'; icon = 'fa-circle-exclamation'; }
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-lg font-medium text-xs flex items-center space-x-2 transition-all duration-300 transform translate-y-2 opacity-0 ${bg}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

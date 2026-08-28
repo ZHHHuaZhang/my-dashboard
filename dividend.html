@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股息自由之路 - 多兵种联合搞钱激励看板</title>
+    <!-- Tailwind CSS for high-fidelity responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for high-quality financial & gamified icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for professional compound interest visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: radial-gradient(circle at top right, #111827 0%, #030712 100%);
+        }
+
+        .glass-card {
+            background: rgba(17, 24, 39, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+        }
+
+        .glass-input {
+            background: rgba(3, 7, 18, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #f8fafc;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-input:focus {
+            border-color: #38bdf8;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+            outline: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(3, 7, 18, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 99px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Milestone progress glowing effects */
+        .milestone-active {
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(17, 24, 39, 0.6) 100%) !important;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); opacity: 0.95; }
+            50% { transform: scale(1.02); opacity: 1; box-shadow: 0 0 15px rgba(56, 189, 248, 0.25); }
+        }
+        .cta-pulse {
+            animation: pulse-glow 3s infinite;
+        }
+
+        .tab-active {
+            color: #38bdf8;
+            border-bottom-color: #38bdf8 !important;
+            background-color: rgba(56, 189, 248, 0.03);
+        }
+
+        .asset-tab-active {
+            background-color: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen pb-12">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <!-- TOP BRANDING & SETTINGS -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 pb-6 border-b border-slate-800/40 gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-xl shadow-lg">
+                        <i class="fa-solid fa-money-bill-trend-up text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-sky-400 via-indigo-300 to-emerald-400 bg-clip-text text-transparent">
+                            股息自由之路
+                        </h1>
+                        <p class="text-slate-400 text-xs mt-0.5">股票筑底 · 基金稳健 · 货基防御 · 多兵种联合激励看板</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="flex flex-col text-right hidden sm:block">
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider">预设终极目标</span>
+                    <span id="target-title-display" class="text-xs font-bold text-sky-400">¥50,000 / 年被动收入</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openTargetModal()" class="px-4.5 py-2 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders text-sky-400"></i> 自定义目标
+                    </button>
+                    <button onclick="openResetModal()" class="px-3.5 py-2 bg-slate-900/40 hover:bg-rose-950/20 border border-slate-800 hover:border-rose-900/30 rounded-xl text-xs font-semibold text-slate-400 hover:text-rose-300 transition-all">
+                        <i class="fa-solid fa-rotate-right"></i> 重置默认
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN DASHBOARD METRICS HERO -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Left: Big Radial Gauge -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+                <div class="absolute -right-24 -bottom-24 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl"></div>
+                
+                <div class="relative flex-shrink-0 w-40 h-40 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="80" cy="80" r="70" stroke="rgba(255,255,255,0.02)" stroke-width="10" fill="transparent" />
+                        <circle id="gauge-ring" cx="80" cy="80" r="70" stroke="url(#gradient-accent)" stroke-width="10" fill="transparent" stroke-dasharray="439.8" stroke-dashoffset="439.8" stroke-linecap="round" class="transition-all duration-1000 ease-out" />
+                        <defs>
+                            <linearGradient id="gradient-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#38bdf8" />
+                                <stop offset="100%" stop-color="#10b981" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute text-center">
+                        <span id="gauge-percent" class="text-2xl font-black text-white">0.0%</span>
+                        <p class="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">自由进度</p>
+                    </div>
+                </div>
+
+                <div class="flex-grow w-full space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-xs text-slate-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-wallet text-emerald-400"></i> 预计年度总被动收益
+                            </span>
+                            <h2 id="total-annual-dividend" class="text-2xl md:text-3xl font-extrabold text-emerald-400 mt-1">¥0.00</h2>
+                            <span id="monthly-average" class="text-[11px] text-slate-500">月均折合: ¥0.00</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-bullseye text-sky-400"></i> 距离目标差值
+                            </span>
+                            <h2 id="gap-to-target" class="text-2xl md:text-3xl font-extrabold text-slate-300 mt-1">¥50,000.00</h2>
+                            <span id="target-title-sub" class="text-[11px] text-slate-500">终极神杯: ¥50,000.00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-950/40 rounded-xl p-3.5 border border-slate-900/60 grid grid-cols-3 gap-2 text-center text-xs">
+                        <div class="border-r border-slate-800/40">
+                            <span class="text-[10px] text-slate-500 block">股票分红</span>
+                            <span id="header-stock-dividend" class="font-bold text-sky-400">¥0.00</span>
+                        </div>
+                        <div class="border-r border-slate-800/40">
+                            <span class="text-[10px] text-slate-500 block">基金分红</span>
+                            <span id="header-fund-dividend" class="font-bold text-indigo-400">¥0.00</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-500 block">货基收益</span>
+                            <span id="header-mm-dividend" class="font-bold text-emerald-400">¥0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Freedom Meter -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute right-3 top-3 opacity-5">
+                    <i class="fa-solid fa-umbrella-beach text-8xl text-sky-400"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2 mb-3">
+                        <i class="fa-solid fa-mug-hot text-amber-400"></i> 综合资产生活折算天数
+                    </h3>
+                    <div class="bg-slate-950/30 border border-slate-900/60 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400">设日开销标准:</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs text-slate-500">¥</span>
+                                <input type="number" id="daily-cost" value="100" class="w-16 bg-slate-950/60 border border-slate-800/80 rounded-md px-1.5 py-0.5 text-xs text-center text-white" oninput="calculateDividends()">
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-800/40 pt-3 flex items-center justify-between">
+                            <div>
+                                <h4 id="freedom-days" class="text-3xl font-extrabold text-amber-400">0.0 天</h4>
+                                <p class="text-[10px] text-slate-500 mt-1">资产收益自动为您承接生存支出的天数</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-slate-900/80 flex items-center justify-center border border-slate-800">
+                                <i id="freedom-icon" class="fa-solid fa-hourglass-start text-sky-400 text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-800/40 text-xs text-slate-500 italic">
+                    <span class="text-slate-300 font-medium">✨ 兵种共振：</span>货币基金防洪，股债基金筑坝，核心高分红个股提供强袭攻城。
+                </div>
+            </div>
+        </div>
+
+        <!-- ASSETS MANAGER & MILESTONES -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Left 2 Cols: Tables with Asset Selector tabs -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <!-- Section Header -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800/50 mb-4 gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-boxes-stacked text-sky-400 text-lg"></i>
+                            <h3 class="text-lg font-bold text-white">多兵种资产明细配置</h3>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 text-xs">
+                            <span id="price-sync-status" class="text-slate-400 flex items-center gap-1.5">
+                                <span class="inline-block w-2 h-2 rounded-full bg-slate-500"></span>
+                                等待联网同步股价...
+                            </span>
+                            <button onclick="fetchStockPrices()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 rounded-lg transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-rotate text-[10px]"></i> 刷新报价
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Inner Asset Selector Tabs -->
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="switchAssetTab('stock')" id="asset-tab-stock" class="flex-1 py-2 px-3 text-center border border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 asset-tab-active">
+                            <i class="fa-solid fa-chart-bar"></i> 核心股票兵团
+                        </button>
+                        <button onclick="switchAssetTab('fund')" id="asset-tab-fund" class="flex-1 py-2 px-3 text-center border border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-chart-pie"></i> 红利/债券基金
+                        </button>
+                        <button onclick="switchAssetTab('moneyMarket')" id="asset-tab-moneyMarket" class="flex-1 py-2 px-3 text-center border border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-piggy-bank"></i> 货基与理财
+                        </button>
+                    </div>
+
+                    <!-- 1. STOCKS PANEL -->
+                    <div id="panel-asset-stock" class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800/40">
+                                    <th class="py-3 px-2">资产名称 (股票)</th>
+                                    <th class="py-3 px-2 text-center">持仓(股)</th>
+                                    <th class="py-3 px-2 text-center">当前股价(元)</th>
+                                    <th class="py-3 px-2 text-center">年度每股分红(元)</th>
+                                    <th class="py-3 px-2 text-center">股息率</th>
+                                    <th class="py-3 px-2 text-center">最新市值(元)</th>
+                                    <th class="py-3 px-2 text-right">预计年分红(元)</th>
+                                    <th class="py-3 px-2 text-center w-12">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stock-list-body" class="divide-y divide-slate-800/20 text-sm">
+                                <!-- Generated Dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 2. FUNDS PANEL -->
+                    <div id="panel-asset-fund" class="overflow-x-auto hidden">
+                        <table class="w-full text-left border-collapse min-w-[680px]">
+                            <thead>
+                                <tr class="text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800/40">
+                                    <th class="py-3 px-2">基金名称 (代码)</th>
+                                    <th class="py-3 px-2 text-center">类型</th>
+                                    <th class="py-3 px-2 text-center">持仓(份)</th>
+                                    <th class="py-3 px-2 text-center">基金净值(元)</th>
+                                    <th class="py-3 px-2 text-center">单份红利(元)</th>
+                                    <th class="py-3 px-2 text-center">持有市值(元)</th>
+                                    <th class="py-3 px-2 text-right">预计年分红(元)</th>
+                                    <th class="py-3 px-2 text-center w-12">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fund-list-body" class="divide-y divide-slate-800/20 text-sm">
+                                <!-- Generated Dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 3. MONEY MARKET PANEL -->
+                    <div id="panel-asset-moneyMarket" class="hidden space-y-4">
+                        <div class="p-4 bg-slate-950/40 border border-slate-800/60 rounded-xl">
+                            <h4 class="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-3">
+                                <i class="fa-solid fa-piggy-bank text-emerald-400"></i> 货基与理财产品汇总
+                            </h4>
+                            <p class="text-[11px] text-slate-400 leading-relaxed mb-4">
+                                这类低风险资产流动性极佳，其收益通常以<strong>七日年化收益率</strong>按日结算，主要作为你资产组合中对抗日常吃喝的流动防御线。
+                            </p>
+                            <div class="mt-4 pt-3 border-t border-slate-800/30">
+                                <div class="flex justify-between items-center text-xs mb-2">
+                                    <span class="text-slate-400">持仓总金额:</span>
+                                    <span id="mm-total-principal" class="font-bold text-slate-300">¥0.00</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs mb-2">
+                                    <span class="text-slate-400">加权平均收益率:</span>
+                                    <span id="mm-average-apy" class="font-bold text-slate-300">0.00%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-400">折合年利息总收入:</span>
+                                    <span id="mm-annual-output" class="font-bold text-emerald-400">¥0.00 / 年</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 货基和理财产品列表 -->
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[600px]">
+                                <thead>
+                                    <tr class="text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800/40">
+                                        <th class="py-3 px-2">产品名称/平台</th>
+                                        <th class="py-3 px-2 text-center">产品类型</th>
+                                        <th class="py-3 px-2 text-center">七日年化 (%)</th>
+                                        <th class="py-3 px-2 text-center">持仓金额(元)</th>
+                                        <th class="py-3 px-2 text-right">年收益(元)</th>
+                                        <th class="py-3 px-2 text-center w-12">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mm-list-body" class="divide-y divide-slate-800/20 text-sm"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-4 flex gap-2">
+                            <button onclick="addMMProduct()" class="px-3 py-1.5 bg-sky-500/20 border border-sky-500/40 rounded-lg text-xs font-bold text-sky-400 hover:bg-sky-500/30 transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-circle-plus"></i> 添加货基/理财产品
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-800/40 gap-4">
+                    <button id="add-asset-trigger-btn" onclick="openAddAssetModal()" class="cta-pulse px-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-md flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-plus"></i> 添加高股息标的 (股票)
+                    </button>
+                    <div class="flex gap-4 text-xs text-slate-400">
+                        <span>总持仓市值: <strong id="total-investment-cost" class="text-slate-200">¥0.00</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right 1 Col: Milestones Progress -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl flex flex-col">
+                <div class="pb-3 border-b border-slate-800/50 mb-4 flex items-center justify-between">
+                    <h3 class="text-md font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-amber-400"></i> 财富自由晋升关卡
+                    </h3>
+                    <span id="milestone-unlocked-count" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">0/6 已点亮</span>
+                </div>
+                
+                <div class="space-y-3 flex-grow overflow-y-auto max-h-[380px] pr-1" id="milestones-container">
+                    <!-- Milestones list -->
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="365">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-bowl-rice"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300">加蛋自由 · 每日1元</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md">¥365/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">每天加一颗优质荷包蛋，最稳固的能量来源。</p>
+                        </div>
+                    </div>
+
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="1500">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-wifi"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300">全年宽带与话费特报</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md">¥1,500/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">数字世界无限畅游通道已被资产自动买单。</p>
+                        </div>
+                    </div>
+
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="5000">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-house-circle-check"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300">全家水电燃物业大包干</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md">¥5,000/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">生存公用开支达成本地永动机，风雨无阻。</p>
+                        </div>
+                    </div>
+
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="15000">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-plane"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300">免单年假轻奢旅行</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md">¥15,000/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">每年由上市公司或理财分红赞助一趟长途海岛游。</p>
+                        </div>
+                    </div>
+
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="30000">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300">核心基准房贷/房租抵消</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md">¥30,000/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">月均折合2500元居住津贴。立足城市的最稳护城河。</p>
+                        </div>
+                    </div>
+
+                    <div class="milestone-card border border-slate-900 bg-slate-950/20 p-3 rounded-xl transition-all duration-300 flex items-start gap-3" data-target="50000">
+                        <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-bold text-slate-300" id="final-milestone-title">终极红利自由 5W 达标</h4>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.2 rounded-md" id="final-milestone-val">¥50,000/年</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">终极目标达成！被动现金流产生源源不断的内生裂变动力。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REINVESTMENT SIMULATOR -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Left inputs for simulation -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-md font-bold text-white flex items-center gap-2 mb-4">
+                        <i class="fa-solid fa-arrows-spin text-sky-400"></i> 复利滚雪球模拟器 (DRIP)
+                    </h3>
+                    <p class="text-xs text-slate-400 mb-6 leading-relaxed">
+                        如果我们将所有**股票/基金分红与货基利息全部买回**，同时配合**每月新增定投资金**，未来我们的被动收入将如何暴增。
+                    </p>
+
+                    <div class="space-y-6">
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-300 mb-2">
+                                <span>每月新增定投资金:</span>
+                                <span class="font-bold text-emerald-400" id="sim-monthly-save-txt">¥3,000</span>
+                            </div>
+                            <input type="range" id="sim-monthly-save" min="0" max="15000" step="500" value="3000" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400" oninput="runDRIPSimulation()">
+                            <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                                <span>¥0</span>
+                                <span>¥15,000</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-300 mb-2">
+                                <span>预期综合股息率 (YoY):</span>
+                                <span class="font-bold text-sky-400" id="sim-dividend-yield-txt">5.50%</span>
+                            </div>
+                            <input type="range" id="sim-dividend-yield" min="2" max="10" step="0.2" value="5.5" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400" oninput="runDRIPSimulation()">
+                            <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                                <span>2.0%</span>
+                                <span>10.0%</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-300 mb-2">
+                                <span>标的股价年化成长率:</span>
+                                <span class="font-bold text-indigo-400" id="sim-asset-growth-txt">3.00%</span>
+                            </div>
+                            <input type="range" id="sim-asset-growth" min="0" max="10" step="0.5" value="3.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400" oninput="runDRIPSimulation()">
+                            <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                                <span>0.0%</span>
+                                <span>10.0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800/40 bg-slate-950/40 p-3.5 rounded-xl border border-slate-900/60">
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        💡 <strong class="text-slate-300">复利力量：</strong>
+                        在第 <span id="target-year-reached" class="font-bold text-sky-400">--</span> 年时，仅靠股利和理财利息，就可以每年额外买入价值约 <span id="annual-reinvest-buying" class="font-bold text-emerald-400">¥0.00</span> 的资产！
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right graph -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center justify-between">
+                        <span>📈 15年多兵种财富增长预测曲线</span>
+                        <span class="text-xs text-emerald-400 font-normal">滚雪球裂变可视化</span>
+                    </h3>
+                </div>
+                <div class="h-64 sm:h-72 w-full mt-4">
+                    <canvas id="compoundChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- WRITING PAD & LOCAL/CLOUD DATA CENTER -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Left: Motivation pad -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-2 flex items-center justify-between">
+                        <span>✍️ 我的财富进军誓言</span>
+                        <i class="fa-solid fa-pen-nib text-indigo-400"></i>
+                    </h3>
+                    <p class="text-xs text-slate-400 mb-3">写下你当下的财富信条，克制无意义消费：</p>
+                    <textarea id="user-motto" class="w-full h-24 glass-input rounded-xl p-3 text-xs leading-relaxed text-slate-200" placeholder="写下一句话警醒自己，例如：'每次想要买非刚需的大件物品时，强迫自己买入红利基金或高分红股票！看看到底谁未来能养我！'"></textarea>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-500 animate-pulse" id="motto-save-time">自动储存中</span>
+                    <button onclick="saveResolution()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 rounded-lg text-xs font-semibold transition-all">
+                        立刻封存誓言
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Data Center Tabbed -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl flex flex-col justify-between overflow-hidden relative">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-800/40 pb-2 mb-3">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-server text-emerald-400"></i> 💾 国内数据中心 (高可用同步)
+                        </h3>
+                    </div>
+                    
+                    <div class="flex border-b border-slate-800/60 text-xs mb-4">
+                        <button onclick="switchBackupTab('gitee')" id="tab-btn-gitee" class="flex-1 py-2 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all font-bold tab-active">
+                            🇨🇳 Gitee 国内云同步
+                        </button>
+                        <button onclick="switchBackupTab('local')" id="tab-btn-local" class="flex-1 py-2 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all font-bold">
+                            📂 本地备份
+                        </button>
+                    </div>
+
+                    <!-- Gitee Tab Content -->
+                    <div id="tab-content-gitee" class="space-y-3">
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            基于 <strong>Gitee (码云)</strong> OpenAPI，提供极其丝滑的国内网络直连。数据100%存在你的**私人仓库**，绝对安全。
+                        </p>
+                        <div class="space-y-2">
+                            <div class="grid grid-cols-3 gap-2 items-center">
+                                <span class="text-[11px] text-slate-300">Gitee 个人令牌:</span>
+                                <input type="password" id="gitee-token" placeholder="输入在Gitee设置生成的Token" class="col-span-2 glass-input text-xs px-2.5 py-1 rounded-md font-mono" onchange="saveSyncCredentials()">
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 items-center">
+                                <span class="text-[11px] text-slate-300">用户名 & 仓库名:</span>
+                                <div class="col-span-2 grid grid-cols-2 gap-1">
+                                    <input type="text" id="gitee-user" placeholder="用户名" class="glass-input text-xs px-2.5 py-1 rounded-md" onchange="saveSyncCredentials()">
+                                    <input type="text" id="gitee-repo" placeholder="仓库名" class="glass-input text-xs px-2.5 py-1 rounded-md" onchange="saveSyncCredentials()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 pt-1 text-xs justify-end">
+                            <button onclick="uploadToGitee()" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-lg transition-all flex items-center gap-1 shadow-md">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 备份到Gitee私有云
+                            </button>
+                            <button onclick="downloadFromGitee()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 rounded-lg font-bold transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> 从Gitee拉取恢复
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Local Sync Tab Content -->
+                    <div id="tab-content-local" class="space-y-3 hidden">
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            离线状态下，您可以直接将配置导出为物理文本文件或拷贝密文进行留底：
+                        </p>
+                        <div class="flex flex-wrap gap-2 pt-1 text-xs">
+                            <button onclick="exportDataAsFile()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 rounded-lg transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-file-export"></i> 导出配置 (.json)
+                            </button>
+                            <button onclick="copyDataString()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 rounded-lg transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-copy"></i> 复制配置文本密文
+                            </button>
+                        </div>
+                        <div class="border-t border-slate-800/40 pt-2 flex items-center gap-2">
+                            <input type="text" id="local-import-box" placeholder="在此粘贴导入的配置文本..." class="flex-grow glass-input text-xs px-2 py-1.5 rounded-md font-mono">
+                            <button onclick="importDataString()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-md text-xs font-bold transition-all">导入</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[10px] text-slate-500">
+                    <span id="gitee-status-msg">首次使用请前往Gitee个人设置初始化</span>
+                    <a href="https://gitee.com/profile/personal_access_tokens" target="_blank" class="text-sky-400 hover:underline">1分钟获取令牌 →</a>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-xs text-slate-500">
+            <p>© 2026 股息自由激励看板 - 用复利和死守创造财务奇迹</p>
+            <p class="mt-1 leading-relaxed">个股和基金分红存在不确定性，请做好理性资产配置与风险控制。股价行情直连腾讯金融延迟API（免爬虫直连）。</p>
+        </footer>
+    </div>
+
+    <!-- CUSTOM DIALOG: CUSTOM TARGET VALUE MODAL -->
+    <div id="target-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-slate-800 max-w-sm w-full mx-4 rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-circle-notch text-sky-400"></i> 自定义年被动目标
+            </h3>
+            <p class="text-xs text-slate-400 mb-5 leading-relaxed">设定您未来的年化被动收入目标。积少成多，可以阶梯拆解。</p>
+            
+            <div class="mb-5">
+                <label class="block text-xs text-slate-300 mb-1.5 font-bold">收益目标额 (元/年):</label>
+                <div class="relative rounded-xl overflow-hidden shadow-inner">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-sm">¥</span>
+                    <input type="number" id="custom-target-input" value="50000" class="w-full glass-input rounded-xl py-2.5 pl-7 pr-3 text-sm text-white font-extrabold" min="100" step="1000">
+                </div>
+            </div>
+
+            <div class="flex gap-2 justify-end text-xs">
+                <button onclick="closeTargetModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg transition-all">取消</button>
+                <button onclick="saveCustomTarget()" class="px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold rounded-lg transition-all shadow-md">应用新目标</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM DIALOG: ADD NEW ASSET MODAL (UNIFIED) -->
+    <div id="add-asset-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-slate-800 max-w-md w-full mx-4 rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-file-circle-plus text-emerald-400"></i> 新增高红利核心配置
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">填写要添加的资产。选择相应的分类，如果是股票输入6位数字代码系统会自动拉取实时价格。</p>
+            
+            <form id="add-asset-form" onsubmit="event.preventDefault(); addNewAsset();" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">资产分类:</label>
+                        <select id="add-asset-type" class="w-full glass-input rounded-lg px-3 py-2 text-xs" onchange="toggleAssetModalCodeRequired()">
+                            <option value="stock">股票标的</option>
+                            <option value="fund">红利/债券基金</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">股票/基金名称:</label>
+                        <input type="text" id="add-asset-name" placeholder="例如: 长江电力" class="w-full glass-input rounded-lg px-3 py-2 text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">代码 (选填):</label>
+                        <input type="text" id="add-asset-code" placeholder="例如: 600900" class="w-full glass-input rounded-lg px-3 py-2 text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">基金类型:</label>
+                        <select id="add-asset-fund-type" class="w-full glass-input rounded-lg px-3 py-2 text-xs">
+                            <option value="场内">场内ETF/LOF</option>
+                            <option value="场外">场外基金</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">持仓数量(股/份):</label>
+                        <input type="number" id="add-asset-shares" required min="1" value="100" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-center">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">资产净值/单价(元):</label>
+                        <input type="number" id="add-asset-price" min="0.01" step="0.01" value="1.00" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-center">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1 font-bold">预计单份年分红(元):</label>
+                        <input type="number" id="add-asset-div" required min="0" step="0.001" value="0.05" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-center">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 justify-end text-xs pt-2">
+                    <button type="button" onclick="closeAddAssetModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg transition-all">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-lg transition-all shadow-md">添加到我的组合</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CUSTOM DIALOG: CONFIRM DELETE MODAL -->
+    <div id="delete-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-rose-900/30 max-w-sm w-full mx-4 rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-md font-bold text-rose-400 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-triangle-exclamation"></i> 确认移除该资产？
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-5" id="delete-modal-desc">您确定要把这只标的从当前的持仓组合中剔除吗？</p>
+            <div class="flex gap-2 justify-end text-xs">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg transition-all">取消</button>
+                <button id="delete-confirm-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-all shadow-md">确认移除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM DIALOG: CONFIRM RESET MODAL -->
+    <div id="reset-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-rose-900/30 max-w-sm w-full mx-4 rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-md font-bold text-rose-400 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-arrow-rotate-left"></i> 确认恢复默认状态？
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-5">
+                此操作将清除所有自定义配置，并将组合恢复为招行100股、平安200股，华泰300ETF、余额宝的基础设置。
+            </p>
+            <div class="flex gap-2 justify-end text-xs">
+                <button onclick="closeResetModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg transition-all">取消</button>
+                <button onclick="resetToDefault()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-all shadow-md">确认恢复</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT CORE -->
+    <script>
+        // Default Core data structure spanning Stocks, Funds & MoneyMarket
+        const INITIAL_STOCKS = [
+            { id: "cmb", name: "招商银行", code: "600036", shares: 100, price: 38.50, dividend: 2.016 },
+            { id: "pingan", name: "中国平安", code: "601318", shares: 200, price: 53.23, dividend: 2.700 }
+        ];
+
+        const INITIAL_FUNDS = [
+            { id: "fund_hs300", name: "沪深300红利ETF", code: "510880", type: "场内", shares: 1000, price: 3.12, dividend: 0.150 }
+        ];
+
+        const INITIAL_MONEY_MARKET = {
+            principal: 0,
+            apy: 1.8,
+            products: [
+                { name: "余额宝", type: "货币基金", apy: 1.8, amount: 0 },
+                { name: "微信零钱通", type: "货币基金", apy: 1.7, amount: 0 },
+                { name: "支付宝定期理财", type: "固收理财", apy: 3.2, amount: 0 },
+                { name: "银行定期理财", type: "定期理财", apy: 4.0, amount: 0 }
+            ]
+        };
+
+        let state = {
+            target: 50000,
+            dailyCost: 100,
+            stocks: [...INITIAL_STOCKS],
+            funds: [...INITIAL_FUNDS],
+            moneyMarket: { ...INITIAL_MONEY_MARKET },
+            resolution: "",
+            giteeToken: "",
+            giteeUser: "",
+            giteeRepo: "my-dividend-data",
+            activeAssetTab: "stock"
+        };
+
+        let compoundChartInstance = null;
+        let activeDeleteIndex = null;
+        let activeDeleteType = null; // 'stock' or 'fund'
+
+        // Custom UI Notification Manager
+        function showToast(message, type = "success") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = `p-3.5 rounded-xl border flex items-center gap-3 shadow-2xl transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto text-xs font-semibold
+                ${type === 'success' ? 'bg-slate-950/90 border-emerald-500/30 text-emerald-300' : 'bg-slate-950/90 border-sky-500/30 text-sky-300'}`;
+            
+            const icon = type === 'success' ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-solid fa-circle-info text-sky-400"></i>';
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // State Save and Load
+        function loadState() {
+            const saved = localStorage.getItem("dividend_freedom_state_v5_gitee");
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    // Standard migration safety checks
+                    if (parsed.stocks) state.stocks = parsed.stocks;
+                    if (parsed.funds) state.funds = parsed.funds;
+                    if (parsed.moneyMarket) state.moneyMarket = parsed.moneyMarket;
+                    if (parsed.target) state.target = parsed.target;
+                    if (parsed.dailyCost) state.dailyCost = parsed.dailyCost;
+                    if (parsed.resolution) state.resolution = parsed.resolution;
+                    if (parsed.giteeToken) state.giteeToken = parsed.giteeToken;
+                    if (parsed.giteeUser) state.giteeUser = parsed.giteeUser;
+                    if (parsed.giteeRepo) state.giteeRepo = parsed.giteeRepo;
+                } catch (e) {
+                    console.error("本地加载缓存异常", e);
+                }
+            }
+        }
+
+        function saveStateToLocal() {
+            localStorage.setItem("dividend_freedom_state_v5_gitee", JSON.stringify(state));
+        }
+
+        // Auto market prefixing helper (CN A-shares & ETFs)
+        function getTencentSymbol(code) {
+            code = code.trim().toLowerCase();
+            if (code.startsWith('sh') || code.startsWith('sz') || code.startsWith('bj') || code.startsWith('hk') || code.startsWith('us')) {
+                return code;
+            }
+            if (/^\d{5}$/.test(code)) {
+                return 'r_hk' + code;
+            }
+            if (/^\d{6}$/.test(code)) {
+                if (code.startsWith('6') || code.startsWith('9') || code.startsWith('5') || code.startsWith('11') || code.startsWith('51') || code.startsWith('56')) {
+                    return 'sh' + code;
+                } else {
+                    return 'sz' + code;
+                }
+            }
+            return code;
+        }
+
+        async function fetchStockPrices() {
+            if (state.stocks.length === 0 && state.funds.length === 0) return;
+            
+            updatePriceSyncStatus('fetching', '正在联网更新中...');
+            
+            // Combine all codes to pull in one unified query
+            const combinedSymbols = [
+                ...state.stocks.map(s => getTencentSymbol(s.code)),
+                ...state.funds.map(f => f.code ? getTencentSymbol(f.code) : '')
+            ].filter(Boolean);
+
+            if (combinedSymbols.length === 0) {
+                updatePriceSyncStatus('success', '无可同步标的');
+                return;
+            }
+
+            const url = `https://qt.gtimg.cn/q=${combinedSymbols.join(',')}`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API请求失败');
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('gbk');
+                const text = decoder.decode(arrayBuffer);
+                
+                const lines = text.split(';');
+                let updatedCount = 0;
+                
+                lines.forEach(line => {
+                    if (!line.trim() || !line.includes('~')) return;
+                    const parts = line.split('~');
+                    if (parts.length < 5) return;
+                    
+                    const resCode = parts[2] ? parts[2].trim() : '';
+                    const resPrice = parseFloat(parts[3]);
+                    const resName = parts[1] ? parts[1].trim() : '';
+                    
+                    if (resCode && !isNaN(resPrice) && resPrice > 0) {
+                        // Find match in stocks
+                        let stock = state.stocks.find(s => {
+                            const sSymbol = getTencentSymbol(s.code);
+                            const matchLineSymbol = line.match(/v_([a-zA-Z0-9_]+)=/);
+                            if (matchLineSymbol && matchLineSymbol[1]) {
+                                if (sSymbol === matchLineSymbol[1].toLowerCase()) return true;
+                            }
+                            return s.code.replace(/\D/g, '') === resCode;
+                        });
+                        
+                        if (stock) {
+                            stock.price = resPrice;
+                            if (resName && (stock.name === "" || stock.name.toLowerCase().includes('stock') || stock.name.includes('新建'))) {
+                                stock.name = resName;
+                            }
+                            updatedCount++;
+                        }
+
+                        // Find match in funds
+                        let fund = state.funds.find(f => {
+                            if (!f.code) return false;
+                            const fSymbol = getTencentSymbol(f.code);
+                            const matchLineSymbol = line.match(/v_([a-zA-Z0-9_]+)=/);
+                            if (matchLineSymbol && matchLineSymbol[1]) {
+                                if (fSymbol === matchLineSymbol[1].toLowerCase()) return true;
+                            }
+                            return f.code.replace(/\D/g, '') === resCode;
+                        });
+
+                        if (fund) {
+                            fund.price = resPrice;
+                            if (resName && (fund.name === "" || fund.name.toLowerCase().includes('fund') || fund.name.includes('新建'))) {
+                                fund.name = resName;
+                            }
+                            updatedCount++;
+                        }
+                    }
+                });
+                
+                if (updatedCount > 0) {
+                    calculateDividends();
+                    const now = new Date();
+                    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                    updatePriceSyncStatus('success', `最新报价同步成功（${timeStr}）`);
+                } else {
+                    updatePriceSyncStatus('warning', '数据匹配失败');
+                }
+            } catch (error) {
+                console.error("获取行情出错: ", error);
+                updatePriceSyncStatus('error', '同步失败，已启用历史参考价');
+            }
+        }
+
+        function updatePriceSyncStatus(status, text) {
+            const container = document.getElementById("price-sync-status");
+            if (!container) return;
+            
+            let dotClass = "bg-slate-500";
+            let textClass = "text-slate-400";
+            
+            if (status === 'fetching') {
+                dotClass = "bg-sky-500 animate-pulse";
+                textClass = "text-sky-400";
+            } else if (status === 'success') {
+                dotClass = "bg-emerald-500";
+                textClass = "text-emerald-400";
+            } else if (status === 'warning') {
+                dotClass = "bg-amber-500";
+                textClass = "text-amber-400";
+            } else if (status === 'error') {
+                dotClass = "bg-rose-500";
+                textClass = "text-rose-400";
+            }
+            
+            container.className = `flex items-center gap-1.5 ${textClass}`;
+            container.innerHTML = `
+                <span class="inline-block w-2 h-2 rounded-full ${dotClass}"></span>
+                <span>${text}</span>
+            `;
+        }
+
+        // Calculation Core Engine
+        function calculateDividends() {
+            let totalStockDividend = 0;
+            let totalStockValue = 0;
+
+            let totalFundDividend = 0;
+            let totalFundValue = 0;
+
+            // 1. Process Stocks
+            const stockTableBody = document.getElementById("stock-list-body");
+            stockTableBody.innerHTML = "";
+            state.stocks.forEach((stock, index) => {
+                const stockDivTotal = stock.shares * stock.dividend;
+                const stockMarketVal = stock.shares * stock.price;
+                
+                totalStockDividend += stockDivTotal;
+                totalStockValue += stockMarketVal;
+
+                const row = document.createElement("tr");
+                row.className = "hover:bg-slate-800/10 transition-all group";
+                row.innerHTML = `
+                    <td class="py-4 px-2">
+                        <div class="font-bold text-slate-100">${stock.name || '未命名个股'}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${stock.code}</div>
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${stock.shares}" min="0" step="10" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateStockShares(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${stock.price}" min="0.01" step="0.01" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateStockPrice(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${stock.dividend}" min="0" step="0.001" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateStockDividend(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center font-mono text-amber-400 text-xs font-bold">
+                        ${stock.price > 0 ? ((stock.dividend / stock.price) * 100).toFixed(2) + '%' : '-'}
+                    </td>
+                    <td class="py-4 px-2 text-center font-mono text-slate-400 text-xs">
+                        ¥${stockMarketVal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="py-4 px-2 text-right font-extrabold text-sky-400 font-mono text-xs">
+                        ¥${stockDivTotal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <button onclick="openDeleteModal('stock', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该股">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                stockTableBody.appendChild(row);
+            });
+
+            // 2. Process Funds
+            const fundTableBody = document.getElementById("fund-list-body");
+            fundTableBody.innerHTML = "";
+            state.funds.forEach((fund, index) => {
+                const fundDivTotal = fund.shares * fund.dividend;
+                const fundMarketVal = fund.shares * fund.price;
+
+                totalFundDividend += fundDivTotal;
+                totalFundValue += fundMarketVal;
+
+                const fundType = fund.type || '场外';
+                const typeClass = fundType === '场内' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-700/30 text-slate-300 border-slate-600/30';
+                
+                const row = document.createElement("tr");
+                row.className = "hover:bg-slate-800/10 transition-all group";
+                row.innerHTML = `
+                    <td class="py-4 px-2">
+                        <div class="font-bold text-slate-100">${fund.name || '未命名基金'}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${fund.code || '场外代码无'}</div>
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeClass}">${fundType}</span>
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${fund.shares}" min="0" step="100" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateFundShares(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${fund.price}" min="0.001" step="0.001" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateFundPrice(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <input type="number" value="${fund.dividend}" min="0" step="0.001" 
+                            class="w-16 glass-input rounded-md py-1 text-center font-mono text-xs focus:ring-1" 
+                            onchange="updateFundDividend(${index}, this.value)">
+                    </td>
+                    <td class="py-4 px-2 text-center font-mono text-slate-400 text-xs">
+                        ¥${fundMarketVal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="py-4 px-2 text-right font-extrabold text-indigo-400 font-mono text-xs">
+                        ¥${fundDivTotal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <button onclick="openDeleteModal('fund', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该基金">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                fundTableBody.appendChild(row);
+            });
+
+            // 3. Process Money Market & Cash Shield - 从state同步到表格并计算
+            let mmTotalPrincipal = 0;
+            let mmTotalDividend = 0;
+            
+            // 确保products数组存在
+            if (!state.moneyMarket.products) {
+                state.moneyMarket.products = [];
+            }
+            
+            // 先同步state到DOM表格
+            const mmTableBody = document.getElementById("mm-list-body");
+            if (mmTableBody) {
+                // 只有在表格内容与state不同步时才重新渲染
+                const currentRowCount = mmTableBody.querySelectorAll("tr").length;
+                if (currentRowCount !== state.moneyMarket.products.length) {
+                    mmTableBody.innerHTML = "";
+                    state.moneyMarket.products.forEach((product, index) => {
+                        const row = document.createElement("tr");
+                        row.className = "hover:bg-slate-800/30 transition-colors";
+                        row.dataset.index = index;
+                        row.innerHTML = `
+                            <td class="py-2 px-2 text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.name}</td>
+                            <td class="py-2 px-2 text-center text-slate-400 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.type}</td>
+                            <td class="py-2 px-2 text-center text-emerald-400 font-semibold mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.apy}%</td>
+                            <td class="py-2 px-2 text-center text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.amount.toFixed(2)}</td>
+                            <td class="py-2 px-2 text-right text-slate-300 mm-result">${product.amount > 0 ? '¥' + (product.amount * product.apy / 100).toFixed(2) : '-'}</td>
+                            <td class="py-2 px-2 text-center"><button onclick="removeMMProduct(${index})" class="text-red-400 hover:text-red-300 text-xs">删除</button></td>
+                        `;
+                        mmTableBody.appendChild(row);
+                    });
+                }
+            }
+            
+            // 从表格读取并更新state，同时计算汇总
+            const mmRows = document.querySelectorAll("#mm-list-body tr");
+            state.moneyMarket.products = [];
+            mmRows.forEach((row, index) => {
+                const cells = row.querySelectorAll("td");
+                const name = cells[0].textContent.trim();
+                const type = cells[1].textContent.trim();
+                const apy = parseFloat(cells[2].textContent.replace('%', '')) || 0;
+                const amount = parseFloat(cells[3].textContent) || 0;
+                
+                state.moneyMarket.products.push({ name, type, apy, amount });
+                
+                if (!isNaN(apy) && !isNaN(amount) && amount > 0) {
+                    mmTotalPrincipal += amount;
+                    mmTotalDividend += amount * apy / 100;
+                }
+            });
+            state.moneyMarket.principal = mmTotalPrincipal;
+            state.moneyMarket.apy = mmTotalPrincipal > 0 ? (mmTotalDividend / mmTotalPrincipal * 100) : 0;
+
+            const totalMMDividend = mmTotalDividend;
+            const averageApy = mmTotalPrincipal > 0 ? (totalMMDividend / mmTotalPrincipal * 100).toFixed(2) : "0.00";
+            document.getElementById("mm-total-principal").innerText = `¥${mmTotalPrincipal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById("mm-average-apy").innerText = `${averageApy}%`;
+            document.getElementById("mm-annual-output").innerText = `¥${totalMMDividend.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / 年 (日均折合 ¥${(totalMMDividend / 365).toFixed(2)} 元)`;
+
+            // 4. Summaries and Aggregations
+            const totalAnnualDividend = totalStockDividend + totalFundDividend + totalMMDividend;
+            const totalAssetsValue = totalStockValue + totalFundValue + mmTotalPrincipal;
+
+            const progressPercent = Math.min((totalAnnualDividend / state.target) * 100, 100);
+            const remainingGap = Math.max(state.target - totalAnnualDividend, 0);
+
+            const dCostInputVal = parseFloat(document.getElementById("daily-cost").value) || 100;
+            state.dailyCost = dCostInputVal;
+            const freedomDaysValue = dCostInputVal > 0 ? totalAnnualDividend / dCostInputVal : 0;
+
+            // Update top highlights
+            document.getElementById("total-annual-dividend").innerText = "¥" + totalAnnualDividend.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById("monthly-average").innerText = `月均折合: ¥${(totalAnnualDividend / 12).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById("gap-to-target").innerText = "¥" + remainingGap.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById("total-investment-cost").innerText = "¥" + totalAssetsValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            // Subcategory metrics
+            document.getElementById("header-stock-dividend").innerText = "¥" + totalStockDividend.toLocaleString('zh-CN', {maximumFractionDigits: 0});
+            document.getElementById("header-fund-dividend").innerText = "¥" + totalFundDividend.toLocaleString('zh-CN', {maximumFractionDigits: 0});
+            document.getElementById("header-mm-dividend").innerText = "¥" + totalMMDividend.toLocaleString('zh-CN', {maximumFractionDigits: 0});
+
+            // Absolute freedom days
+            document.getElementById("freedom-days").innerText = freedomDaysValue.toFixed(1) + " 天";
+            const fIcon = document.getElementById("freedom-icon");
+            if (freedomDaysValue >= 365) {
+                fIcon.className = "fa-solid fa-umbrella-beach text-emerald-400 text-lg";
+            } else if (freedomDaysValue >= 30) {
+                fIcon.className = "fa-solid fa-calendar-check text-sky-400 text-lg";
+            } else {
+                fIcon.className = "fa-solid fa-hourglass-start text-indigo-400 text-lg";
+            }
+
+            // Circle ring updates
+            const gaugePercentSpan = document.getElementById("gauge-percent");
+            gaugePercentSpan.innerText = progressPercent.toFixed(1) + "%";
+
+            const rCircle = document.getElementById("gauge-ring");
+            const rDashArray = 439.8; 
+            const rDashOffset = rDashArray - (progressPercent / 100) * rDashArray;
+            rCircle.style.strokeDashoffset = rDashOffset;
+
+            // Trigger child-updates
+            updateMilestones(totalAnnualDividend);
+            runDRIPSimulation(totalAssetsValue, totalAnnualDividend);
+
+            saveStateToLocal();
+        }
+
+        function updateMilestones(currentTotalIncome) {
+            const milestoneCards = document.querySelectorAll(".milestone-card");
+            let unlockedCount = 0;
+
+            milestoneCards.forEach(card => {
+                const reqValue = parseFloat(card.getAttribute("data-target"));
+                const iconBox = card.querySelector(".milestone-icon");
+                const labelText = card.querySelector("h4");
+
+                if (currentTotalIncome >= reqValue) {
+                    card.classList.add("milestone-active");
+                    iconBox.className = "mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-sm border border-emerald-500/40 text-emerald-400 milestone-icon shadow-md animate-bounce";
+                    labelText.className = "text-xs font-bold text-emerald-300 flex items-center gap-1";
+                    if (!labelText.querySelector(".fa-circle-check")) {
+                        labelText.innerHTML += ' <i class="fa-solid fa-circle-check text-[10px]"></i>';
+                    }
+                    unlockedCount++;
+                } else {
+                    card.classList.remove("milestone-active");
+                    iconBox.className = "mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sm border border-slate-800 text-slate-500 milestone-icon";
+                    labelText.className = "text-xs font-bold text-slate-300";
+                    const badgeCheck = labelText.querySelector(".fa-circle-check");
+                    if (badgeCheck) badgeCheck.remove();
+                }
+            });
+
+            document.getElementById("milestone-unlocked-count").innerText = `${unlockedCount}/${milestoneCards.length} 已点亮`;
+        }
+
+        // Inline Editors: Stocks
+        function updateStockShares(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0, 0);
+            state.stocks[index].shares = parsedVal;
+            calculateDividends();
+            showToast(`已将持仓更新为 ${parsedVal} 股`, "info");
+        }
+
+        function updateStockPrice(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0.01, 0.01);
+            state.stocks[index].price = parsedVal;
+            calculateDividends();
+            showToast(`估值单价修正为 ¥${parsedVal.toFixed(2)}`, "info");
+        }
+
+        function updateStockDividend(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0, 0);
+            state.stocks[index].dividend = parsedVal;
+            calculateDividends();
+            showToast(`预计派息更新为 ¥${parsedVal.toFixed(3)}`, "info");
+        }
+
+        // Inline Editors: Funds
+        function updateFundShares(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0, 0);
+            state.funds[index].shares = parsedVal;
+            calculateDividends();
+            showToast(`已将基金份额更新为 ${parsedVal} 份`, "info");
+        }
+
+        function updateFundPrice(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0.001, 0.001);
+            state.funds[index].price = parsedVal;
+            calculateDividends();
+            showToast(`基金净值修正为 ¥${parsedVal.toFixed(3)}`, "info");
+        }
+
+        function updateFundDividend(index, value) {
+            const parsedVal = Math.max(parseFloat(value) || 0, 0);
+            state.funds[index].dividend = parsedVal;
+            calculateDividends();
+            showToast(`每份分红更新为 ¥${parsedVal.toFixed(3)}`, "info");
+        }
+
+        // Asset tabs switcher
+        function switchAssetTab(tabName) {
+            state.activeAssetTab = tabName;
+            
+            const btnStock = document.getElementById("asset-tab-stock");
+            const btnFund = document.getElementById("asset-tab-fund");
+            const btnMM = document.getElementById("asset-tab-moneyMarket");
+
+            const panelStock = document.getElementById("panel-asset-stock");
+            const panelFund = document.getElementById("panel-asset-fund");
+            const panelMM = document.getElementById("panel-asset-moneyMarket");
+
+            const addTriggerBtn = document.getElementById("add-asset-trigger-btn");
+
+            // Reset classes
+            [btnStock, btnFund, btnMM].forEach(b => b.classList.remove('asset-tab-active'));
+            [panelStock, panelFund, panelMM].forEach(p => p.classList.add('hidden'));
+
+            if (tabName === 'stock') {
+                btnStock.classList.add('asset-tab-active');
+                panelStock.classList.remove('hidden');
+                addTriggerBtn.classList.remove('hidden');
+                addTriggerBtn.innerHTML = `<i class="fa-solid fa-circle-plus"></i> 添加高股息标的 (股票)`;
+            } else if (tabName === 'fund') {
+                btnFund.classList.add('asset-tab-active');
+                panelFund.classList.remove('hidden');
+                addTriggerBtn.classList.remove('hidden');
+                addTriggerBtn.innerHTML = `<i class="fa-solid fa-circle-plus"></i> 添加红利/债券基金`;
+            } else if (tabName === 'moneyMarket') {
+                btnMM.classList.add('asset-tab-active');
+                panelMM.classList.remove('hidden');
+                addTriggerBtn.classList.add('hidden'); // No manual item insertion for MM principal
+            }
+        }
+
+        function addMMProduct() {
+            // 添加到state
+            const newProduct = { name: "新产品", type: "货币基金", apy: 1.8, amount: 0 };
+            state.moneyMarket.products.push(newProduct);
+            
+            // 更新UI
+            const tbody = document.getElementById("mm-list-body");
+            const row = document.createElement("tr");
+            row.className = "hover:bg-slate-800/30 transition-colors";
+            row.dataset.index = state.moneyMarket.products.length - 1;
+            row.innerHTML = `
+                <td class="py-2 px-2 text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">新产品</td>
+                <td class="py-2 px-2 text-center text-slate-400 mm-editable" contenteditable="true" onblur="updateMMRow(this)">货币基金</td>
+                <td class="py-2 px-2 text-center text-emerald-400 font-semibold mm-editable" contenteditable="true" onblur="updateMMRow(this)">1.8%</td>
+                <td class="py-2 px-2 text-center text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">0</td>
+                <td class="py-2 px-2 text-right text-slate-300 mm-result">-</td>
+                <td class="py-2 px-2 text-center"><button onclick="removeMMProduct(${state.moneyMarket.products.length - 1})" class="text-red-400 hover:text-red-300 text-xs">删除</button></td>
+            `;
+            tbody.appendChild(row);
+            saveStateToLocal();
+            showToast("已添加新产品，点击单元格即可编辑", "success");
+        }
+        
+        function removeMMProduct(index) {
+            state.moneyMarket.products.splice(index, 1);
+            calculateDividends();
+            showToast("产品已删除", "info");
+        }
+
+        function updateMMRow(cell) {
+            const row = cell.closest('tr');
+            const cells = row.querySelectorAll('td');
+            const apyText = cells[2].textContent.trim();
+            const amountText = cells[3].textContent.trim();
+            
+            // 确保年化率显示%符号
+            if (apyText && !apyText.includes('%') && !isNaN(parseFloat(apyText))) {
+                cells[2].textContent = apyText + '%';
+            }
+            
+            const apy = parseFloat(cells[2].textContent.replace('%', ''));
+            const amount = parseFloat(amountText);
+            
+            if (!isNaN(apy) && !isNaN(amount) && amount >= 0) {
+                cells[3].textContent = amount.toFixed(2);
+                const annualYield = (amount * apy / 100).toFixed(2);
+                cells[4].textContent = "¥" + annualYield;
+                cells[4].className = "py-2 px-2 text-right text-emerald-400 font-semibold mm-result";
+            } else {
+                cells[3].textContent = "0.00";
+                cells[4].textContent = "-";
+                cells[4].className = "py-2 px-2 text-right text-slate-300 mm-result";
+            }
+            
+            calculateDividends();
+        }
+
+        // Beautiful Confirmation Dialog wrappers
+        function openDeleteModal(type, index) {
+            activeDeleteType = type;
+            activeDeleteIndex = index;
+            const assetName = type === 'stock' ? state.stocks[index].name : state.funds[index].name;
+            document.getElementById("delete-modal-desc").innerText = `您确定要把高收益核心资产《${assetName}》从您的自选持仓组合中剔除吗？`;
+            
+            const modal = document.getElementById("delete-modal");
+            modal.classList.remove("hidden");
+            setTimeout(() => modal.classList.add("opacity-100"), 10);
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById("delete-modal");
+            modal.classList.remove("opacity-100");
+            setTimeout(() => {
+                modal.classList.add("hidden");
+                activeDeleteIndex = null;
+                activeDeleteType = null;
+            }, 300);
+        }
+
+        document.getElementById("delete-confirm-btn").onclick = function() {
+            if (activeDeleteIndex !== null && activeDeleteType !== null) {
+                if (activeDeleteType === 'stock') {
+                    const deletedName = state.stocks[activeDeleteIndex].name;
+                    state.stocks.splice(activeDeleteIndex, 1);
+                    calculateDividends();
+                    closeDeleteModal();
+                    showToast(`已成功清退股票资产《${deletedName}》`, "success");
+                } else {
+                    const deletedName = state.funds[activeDeleteIndex].name;
+                    state.funds.splice(activeDeleteIndex, 1);
+                    calculateDividends();
+                    closeDeleteModal();
+                    showToast(`已成功清退基金资产《${deletedName}》`, "success");
+                }
+            }
+        };
+
+        function runDRIPSimulation(initialValue, initialDividend) {
+            const saveMonthly = parseFloat(document.getElementById("sim-monthly-save").value);
+            const yieldExpect = parseFloat(document.getElementById("sim-dividend-yield").value) / 100;
+            const assetGrowth = parseFloat(document.getElementById("sim-asset-growth").value) / 100;
+
+            document.getElementById("sim-monthly-save-txt").innerText = "¥" + saveMonthly.toLocaleString();
+            document.getElementById("sim-dividend-yield-txt").innerText = (yieldExpect * 100).toFixed(2) + "%";
+            document.getElementById("sim-asset-growth-txt").innerText = (assetGrowth * 100).toFixed(2) + "%";
+
+            let currentAssetVal = initialValue !== undefined ? initialValue : 0;
+            let currentDividend = initialDividend !== undefined ? initialDividend : 0;
+
+            let chartLabels = [];
+            let chartDividendData = [];
+            let chartAssetData = [];
+
+            let targetReachedYear = "--";
+            let reinvestBuyingPower = 0;
+
+            for (let year = 1; year <= 15; year++) {
+                chartLabels.push(`第 ${year} 年`);
+                currentAssetVal = currentAssetVal * (1 + assetGrowth) + (saveMonthly * 12) + currentDividend;
+                currentDividend = currentAssetVal * yieldExpect;
+
+                chartDividendData.push(Math.round(currentDividend));
+                chartAssetData.push(Math.round(currentAssetVal));
+
+                if (currentDividend >= state.target && targetReachedYear === "--") {
+                    targetReachedYear = year;
+                    reinvestBuyingPower = currentDividend;
+                }
+            }
+
+            document.getElementById("target-year-reached").innerText = targetReachedYear;
+            document.getElementById("annual-reinvest-buying").innerText = "¥" + (reinvestBuyingPower || currentDividend).toLocaleString('zh-CN', {maximumFractionDigits: 0});
+
+            const ctx = document.getElementById('compoundChart').getContext('2d');
+            
+            if (compoundChartInstance) {
+                compoundChartInstance.data.labels = chartLabels;
+                compoundChartInstance.data.datasets[0].data = chartDividendData;
+                compoundChartInstance.data.datasets[1].data = chartAssetData;
+                compoundChartInstance.update();
+            } else {
+                compoundChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [
+                            {
+                                label: '预计年总收益额 (元)',
+                                data: chartDividendData,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#10b981',
+                                tension: 0.3,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: '预计总资产市值 (元)',
+                                data: chartAssetData,
+                                borderColor: '#38bdf8',
+                                backgroundColor: 'rgba(56, 189, 248, 0.03)',
+                                borderWidth: 1.5,
+                                borderDash: [5, 5],
+                                pointBackgroundColor: '#38bdf8',
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                hidden: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                labels: { color: '#94a3b8', font: { size: 10 } }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255,255,255,0.02)' },
+                                ticks: { color: '#64748b' }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                grid: { color: 'rgba(255,255,255,0.04)' },
+                                ticks: { color: '#10b981', callback: value => '¥' + value.toLocaleString() }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: false,
+                                position: 'right',
+                                grid: { drawOnChartArea: false },
+                                ticks: { color: '#38bdf8', callback: value => '¥' + value.toLocaleString() }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Custom Target Adjustments Modals
+        function openTargetModal() {
+            const modal = document.getElementById("target-modal");
+            document.getElementById("custom-target-input").value = state.target;
+            modal.classList.remove("hidden");
+            setTimeout(() => modal.classList.add("opacity-100"), 10);
+        }
+
+        function closeTargetModal() {
+            const modal = document.getElementById("target-modal");
+            modal.classList.remove("opacity-100");
+            setTimeout(() => modal.classList.add("hidden"), 300);
+        }
+
+        function saveCustomTarget() {
+            const val = parseFloat(document.getElementById("custom-target-input").value) || 50000;
+            state.target = val;
+            
+            const lastMilestone = document.getElementById("final-milestone-title");
+            const lastMilestoneVal = document.getElementById("final-milestone-val");
+            
+            lastMilestone.innerText = `自定目标`;
+            lastMilestoneVal.innerText = `¥${val.toLocaleString()}/年`;
+            
+            const lastCard = document.querySelector('.milestone-card[data-target="50000"]');
+            if (lastCard) {
+                lastCard.setAttribute("data-target", val);
+            }
+
+            document.getElementById("target-title-display").innerText = `¥${val.toLocaleString()} / 年被动收入`;
+            document.getElementById("target-title-sub").innerText = `终极神杯: ¥${val.toLocaleString()}`;
+
+            calculateDividends();
+            closeTargetModal();
+            showToast("激励目标变动成功！", "success");
+        }
+
+        // Add Asset Modal Controllers
+        function openAddAssetModal() {
+            const modal = document.getElementById("add-asset-modal");
+            
+            // Set default values based on selected tab
+            document.getElementById("add-asset-type").value = state.activeAssetTab === 'fund' ? 'fund' : 'stock';
+            toggleAssetModalCodeRequired();
+            
+            modal.classList.remove("hidden");
+            setTimeout(() => modal.classList.add("opacity-100"), 10);
+        }
+
+        function closeAddAssetModal() {
+            const modal = document.getElementById("add-asset-modal");
+            modal.classList.remove("opacity-100");
+            setTimeout(() => modal.classList.add("hidden"), 300);
+        }
+
+        function toggleAssetModalCodeRequired() {
+            const type = document.getElementById("add-asset-type").value;
+            const codeEl = document.getElementById("add-asset-code");
+            if (type === 'stock') {
+                codeEl.placeholder = "例如: 600900 (建议填写以拉取报价)";
+            } else {
+                codeEl.placeholder = "例如: 510880 (场内基金可填代码，场外留空)";
+            }
+        }
+
+        function addNewAsset() {
+            const type = document.getElementById("add-asset-type").value;
+            const name = document.getElementById("add-asset-name").value.trim();
+            const code = document.getElementById("add-asset-code").value.trim();
+            const fundType = document.getElementById("add-asset-fund-type").value;
+            const shares = parseFloat(document.getElementById("add-asset-shares").value) || 100;
+            const price = parseFloat(document.getElementById("add-asset-price").value) || 1.00;
+            const dividend = parseFloat(document.getElementById("add-asset-div").value) || 0.05;
+
+            const newAssetObj = {
+                id: "asset_" + Date.now(),
+                name: name || `新建标的 - ${code || '无代码'}`,
+                code: code,
+                type: type === 'fund' ? fundType : undefined,
+                shares: shares,
+                price: price,
+                dividend: dividend
+            };
+
+            if (type === 'stock') {
+                if(!code) {
+                    showToast("添加股票必须提供代码以便同步价格", "warning");
+                    return;
+                }
+                state.stocks.push(newAssetObj);
+                showToast(`已添加股票《${newAssetObj.name}》，正在同步市场最新报价...`, "success");
+            } else {
+                state.funds.push(newAssetObj);
+                showToast(`已添加${fundType}基金《${newAssetObj.name}》`, "success");
+            }
+
+            calculateDividends();
+            closeAddAssetModal();
+            fetchStockPrices();
+            
+            document.getElementById("add-asset-form").reset();
+        }
+
+        // Reset system wrapper
+        function openResetModal() {
+            const modal = document.getElementById("reset-modal");
+            modal.classList.remove("hidden");
+            setTimeout(() => modal.classList.add("opacity-100"), 10);
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById("reset-modal");
+            modal.classList.remove("opacity-100");
+            setTimeout(() => modal.classList.add("hidden"), 300);
+        }
+
+        function resetToDefault() {
+            state = {
+                target: 50000,
+                dailyCost: 100,
+                stocks: [...INITIAL_STOCKS],
+                funds: [...INITIAL_FUNDS],
+                moneyMarket: { 
+                    ...INITIAL_MONEY_MARKET,
+                    products: JSON.parse(JSON.stringify(INITIAL_MONEY_MARKET.products))
+                },
+                resolution: "",
+                giteeToken: "",
+                giteeUser: "",
+                giteeRepo: "my-dividend-data",
+                activeAssetTab: "stock"
+            };
+            
+            document.getElementById("final-milestone-title").innerText = "终极红利自由 5W 达标";
+            document.getElementById("final-milestone-val").innerText = "¥50,000/年";
+            
+            document.getElementById("user-motto").value = "";
+            document.getElementById("daily-cost").value = 100;
+            document.getElementById("gitee-token").value = "";
+            document.getElementById("gitee-user").value = "";
+            document.getElementById("gitee-repo").value = "my-dividend-data";
+
+            switchAssetTab("stock");
+            calculateDividends();
+            fetchStockPrices();
+            closeResetModal();
+            showToast("看板已恢复至多兵种联合默认设置！", "success");
+        }
+
+        function saveResolution() {
+            const res = document.getElementById("user-motto").value;
+            state.resolution = res;
+            saveStateToLocal();
+            
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            document.getElementById("motto-save-time").innerText = `已于 ${timeStr} 封存`;
+            
+            showToast("财富进军誓言已成功封存！🔥", "success");
+        }
+
+        // Tab switches for data backup panel
+        function switchBackupTab(tabName) {
+            const btnGitee = document.getElementById("tab-btn-gitee");
+            const btnLocal = document.getElementById("tab-btn-local");
+            const contentGitee = document.getElementById("tab-content-gitee");
+            const contentLocal = document.getElementById("tab-content-local");
+
+            if (tabName === 'gitee') {
+                btnGitee.classList.add('tab-active');
+                btnLocal.classList.remove('tab-active');
+                contentGitee.classList.remove('hidden');
+                contentLocal.classList.add('hidden');
+            } else {
+                btnLocal.classList.add('tab-active');
+                btnGitee.classList.remove('tab-active');
+                contentLocal.classList.remove('hidden');
+                contentGitee.classList.add('hidden');
+            }
+        }
+
+        // Local physical backup
+        function exportDataAsFile() {
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `dividend_freedom_dashboard_multiclass_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("本地配置文件导出下载成功！", "success");
+        }
+
+        function copyDataString() {
+            const copyState = { ...state };
+            copyState.giteeToken = ""; // Strip tokens
+            const dataStr = btoa(encodeURIComponent(JSON.stringify(copyState)));
+            
+            // Safe copy fallback
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = dataStr;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            
+            showToast("备份文本密文已成功复制至剪贴板！", "success");
+        }
+
+        function importDataString() {
+            const inputVal = document.getElementById("local-import-box").value.trim();
+            if (!inputVal) {
+                showToast("请先贴入备份的密文字符串", "warning");
+                return;
+            }
+            try {
+                const decodedJson = decodeURIComponent(atob(inputVal));
+                const parsed = JSON.parse(decodedJson);
+                if (parsed.stocks || parsed.funds || parsed.moneyMarket) {
+                    state = { ...state, ...parsed };
+                    
+                    
+
+                    calculateDividends();
+                    fetchStockPrices();
+                    document.getElementById("local-import-box").value = "";
+                    showToast("多兵种资产配置一键导入成功！", "success");
+                } else {
+                    showToast("导入格式异常或字段缺失", "warning");
+                }
+            } catch (e) {
+                showToast("解析数据密文失败，请重试！", "warning");
+            }
+        }
+
+        // Credentials Saving
+        function saveSyncCredentials() {
+            state.giteeToken = document.getElementById("gitee-token").value.trim();
+            state.giteeUser = document.getElementById("gitee-user").value.trim();
+            state.giteeRepo = document.getElementById("gitee-repo").value.trim() || "my-dividend-data";
+            saveStateToLocal();
+        }
+
+        async function getGiteeFileInfo(token, user, repo, path) {
+            const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}?access_token=${token}`;
+            const res = await fetch(url);
+            if (res.status === 200) return await res.json();
+            return null;
+        }
+
+        async function uploadToGitee() {
+            const token = document.getElementById("gitee-token").value.trim();
+            const user = document.getElementById("gitee-user").value.trim();
+            const repo = document.getElementById("gitee-repo").value.trim();
+            const statusEl = document.getElementById("gitee-status-msg");
+
+            if (!token || !user || !repo) {
+                showToast("请填写完整的 Gitee 令牌、用户名和私有仓库！", "warning");
+                return;
+            }
+
+            state.giteeToken = token;
+            saveStateToLocal();
+
+            statusEl.className = "text-sky-400";
+            statusEl.innerText = "正在同步备份到 Gitee 云端...";
+
+            const path = "dividend_freedom_data.json";
+            const payload = { ...state };
+            payload.giteeToken = ""; // Strip token from safe payload
+
+            const contentStr = JSON.stringify(payload, null, 2);
+            // Safe Unicode conversion for Base64 standard
+            const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+
+            try {
+                const fileInfo = await getGiteeFileInfo(token, user, repo, path);
+                
+                let bodyData = {
+                    access_token: token,
+                    content: base64Content,
+                    message: "Backup dividend dashboard from Unified Multi-Asset Panel"
+                };
+                
+                let method = "POST";
+                if (fileInfo && fileInfo.sha) {
+                    method = "PUT";
+                    bodyData.sha = fileInfo.sha;
+                }
+
+                const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}`;
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+
+                if (response.ok) {
+                    statusEl.className = "text-emerald-400";
+                    const now = new Date();
+                    statusEl.innerText = `云端同步备份完成 (${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')})`;
+                    showToast("🎉 Gitee 国内高速备份成功！", "success");
+                } else {
+                    const err = await response.json();
+                    statusEl.className = "text-rose-400";
+                    statusEl.innerText = "备份失败: " + (err.message || "请求异常");
+                    showToast("备份错误，请检查私有仓库是否存在！", "warning");
+                }
+            } catch (e) {
+                console.error("Gitee 云端上传异常:", e);
+                statusEl.className = "text-rose-400";
+                statusEl.innerText = "云上传请求超时，请核对凭据";
+                showToast("连接 Gitee 失败，请确认国内节点网络", "warning");
+            }
+        }
+
+        async function downloadFromGitee() {
+            const token = document.getElementById("gitee-token").value.trim();
+            const user = document.getElementById("gitee-user").value.trim();
+            const repo = document.getElementById("gitee-repo").value.trim();
+            const statusEl = document.getElementById("gitee-status-msg");
+
+            if (!token || !user || !repo) {
+                showToast("请填齐 Gitee 配置信息以拉取覆盖数据！", "warning");
+                return;
+            }
+
+            statusEl.className = "text-sky-400";
+            statusEl.innerText = "正在从 Gitee 提取历史备份...";
+
+            try {
+                const fileInfo = await getGiteeFileInfo(token, user, repo, "dividend_freedom_data.json");
+                if (fileInfo && fileInfo.content) {
+                    const rawBin = atob(fileInfo.content);
+                    const decodedStr = decodeURIComponent(Array.prototype.map.call(rawBin, c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+                    
+                    const cloudState = JSON.parse(decodedStr);
+                    if (cloudState) {
+                        state = {
+                            ...state,
+                            ...cloudState,
+                            giteeToken: token,
+                            giteeUser: user,
+                            giteeRepo: repo
+                        };
+
+                        document.getElementById("daily-cost").value = state.dailyCost || 100;
+                        document.getElementById("user-motto").value = state.resolution || "";
+
+                        switchAssetTab(state.activeAssetTab || "stock");
+                        calculateDividends();
+                        fetchStockPrices();
+
+                        statusEl.className = "text-emerald-400";
+                        statusEl.innerText = "📥 云端提取覆盖激活成功！";
+                        showToast("云端多兵种资产还原成功，数据已刷新！", "success");
+                    }
+                } else {
+                    statusEl.className = "text-rose-400";
+                    statusEl.innerText = "云端未发现特定同步文件";
+                }
+            } catch (e) {
+                console.error("Gitee 云提取异常:", e);
+                statusEl.className = "text-rose-400";
+                statusEl.innerText = "获取失败，请确保私有仓库及Token正常";
+            }
+        }
+
+        // Core initializer
+        window.onload = function() {
+            loadState();
+            
+            if (state.resolution) {
+                document.getElementById("user-motto").value = state.resolution;
+            }
+            if (state.dailyCost) {
+                document.getElementById("daily-cost").value = state.dailyCost;
+            }
+            if (state.giteeToken) {
+                document.getElementById("gitee-token").value = state.giteeToken;
+            }
+            if (state.giteeUser) {
+                document.getElementById("gitee-user").value = state.giteeUser;
+            }
+            if (state.giteeRepo) {
+                document.getElementById("gitee-repo").value = state.giteeRepo;
+            }
+            
+
+            switchAssetTab(state.activeAssetTab || "stock");
+            calculateDividends();
+            fetchStockPrices();
+            
+            // Motto auto saving debounce
+            let typingTimer;
+            document.getElementById("user-motto").addEventListener("input", function() {
+                clearTimeout(typingTimer);
+                document.getElementById("motto-save-time").innerText = "誓言雕琢中...";
+                typingTimer = setTimeout(() => {
+                    saveResolution();
+                }, 1500);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,2617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智投精算看板 - 基金与股票全能投资管理</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        [v-cloak] { display: none; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+
+<div id="app" v-cloak class="p-4 md:p-6 lg:p-8 max-w-[1700px] mx-auto space-y-6">
+
+    <!-- Top Bar Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex items-center space-x-3">
+            <div class="p-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-100">
+                <i data-lucide="line-chart" class="w-7 h-7"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">智投精算看板</h1>
+                <p class="text-xs text-slate-500">实时追踪场内/场外基金及股票资产 | 自动计算独立年化收益率</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <button @click="fetchLatestPrices" :disabled="isRefreshing" class="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-sm font-semibold transition border border-emerald-200/60 disabled:opacity-50">
+                <i data-lucide="refresh-cw" :class="{'animate-spin': isRefreshing}" class="w-4 h-4"></i>
+                <span>{{ isRefreshing ? '刷新中...' : '一键刷新现价' }}</span>
+            </button>
+            <button @click="openOffMarketFundModal" class="flex items-center space-x-1.5 px-3.5 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-xl text-sm font-semibold transition border border-amber-200/60">
+                <i data-lucide="pencil" class="w-4 h-4"></i>
+                <span>编辑场外基金价格</span>
+            </button>
+
+            <button @click="openAiDiagnosis" class="flex items-center space-x-1.5 px-3.5 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl text-sm font-semibold transition border border-purple-200/60">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span>AI 投资诊断</span>
+            </button>
+
+            <!-- 综合股息率按钮：仅在「股票」类别 tab 选中时显示 -->
+            <button v-if="filterType === '股票'" @click="openDividendModal" class="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 hover:from-amber-100 hover:to-orange-100 rounded-xl text-sm font-bold transition border border-amber-300/70 shadow-sm shadow-amber-100">
+                <i data-lucide="coins" class="w-4 h-4"></i>
+                <span>综合股息率 · 年化分红</span>
+                <span v-if="stockDividendSummary.totalAnnualDividend > 0" class="bg-white/80 px-1.5 py-0.5 rounded-lg text-[10px] font-extrabold text-amber-700 font-mono">
+                    ¥{{ formatMoney(stockDividendSummary.totalAnnualDividend) }}
+                </span>
+            </button>
+
+            <button @click="openModal()" class="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-100 transition">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>新增交易记账</span>
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+            <button @click="exportData" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="导出 JSON 数据">
+                <i data-lucide="download" class="w-5 h-5"></i>
+            </button>
+            <button @click="openImportModal" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="导入 JSON 数据">
+                <i data-lucide="upload" class="w-5 h-5"></i>
+            </button>
+
+            <button @click="downloadSampleData" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition" title="下载样板数据">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+            <button @click="openGiteeSyncModal" class="flex items-center space-x-1.5 px-3 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl text-sm font-semibold transition border border-orange-200/60" title="Gitee 云端同步">
+                <i data-lucide="cloud" class="w-4 h-4"></i>
+                <span>Gitee 同步</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- KPI Overview Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Card 1: 本金总计 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">投入本金总计</div>
+            <div class="text-2xl font-extrabold text-slate-800">¥ {{ formatMoney(summary.totalPrincipal) }}</div>
+            <div class="mt-2 text-xs text-slate-500 flex items-center justify-between">
+                <span>持有中: ¥ {{ formatMoney(summary.holdingPrincipal) }}</span>
+                <span>已卖出: ¥ {{ formatMoney(summary.soldPrincipal) }}</span>
+            </div>
+            <div class="absolute -right-3 -bottom-3 w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center opacity-70">
+                <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+            </div>
+        </div>
+
+        <!-- Card 2: 当前市值 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">当前持仓总市值</div>
+            <div class="text-2xl font-extrabold text-indigo-600">¥ {{ formatMoney(summary.holdingMarketValue) }}</div>
+            <div class="mt-2 text-xs text-slate-500">持仓笔数: <span class="font-bold text-slate-700">{{ summary.holdingCount }}</span> 笔</div>
+            <div class="absolute -right-3 -bottom-3 w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center opacity-70">
+                <i data-lucide="pie-chart" class="w-8 h-8 text-indigo-500"></i>
+            </div>
+        </div>
+
+        <!-- Card 3: 持仓浮动盈亏 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">持仓浮动盈亏</div>
+            <div class="text-2xl font-extrabold" :class="summary.unrealizedProfit >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                {{ summary.unrealizedProfit >= 0 ? '+' : '' }}¥ {{ formatMoney(summary.unrealizedProfit) }}
+            </div>
+            <div class="mt-2 text-xs font-semibold flex items-center space-x-1" :class="summary.unrealizedRate >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                <i :data-lucide="summary.unrealizedRate >= 0 ? 'trending-up' : 'trending-down'" class="w-3.5 h-3.5"></i>
+                <span>收益率: {{ (summary.unrealizedRate * 100).toFixed(2) }}%</span>
+            </div>
+            <div class="absolute -right-3 -bottom-3 w-16 h-16 rounded-full flex items-center justify-center opacity-70" :class="summary.unrealizedProfit >= 0 ? 'bg-rose-50' : 'bg-emerald-50'">
+                <i :data-lucide="summary.unrealizedProfit >= 0 ? 'trending-up' : 'trending-down'" class="w-8 h-8" :class="summary.unrealizedProfit >= 0 ? 'text-rose-500' : 'text-emerald-500'"></i>
+            </div>
+        </div>
+
+        <!-- Card 4: 已清仓实际获利 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">已实现赎回净获利</div>
+            <div class="text-2xl font-extrabold" :class="summary.realizedProfit >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                {{ summary.realizedProfit >= 0 ? '+' : '' }}¥ {{ formatMoney(summary.realizedProfit) }}
+            </div>
+            <div class="mt-2 text-xs text-slate-500">清仓笔数: <span class="font-bold text-slate-700">{{ summary.soldCount }}</span> 笔</div>
+            <div class="absolute -right-3 -bottom-3 w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center opacity-70">
+                <i data-lucide="badge-dollar-sign" class="w-8 h-8 text-amber-500"></i>
+            </div>
+        </div>
+
+        <!-- Card 5: 加权的加仓计划与综合年化 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">平均持有与计划加仓</div>
+            <div class="text-lg font-bold text-slate-800">计划加仓: <span class="text-indigo-600">¥ {{ formatMoney(summary.totalPlanAdd) }}</span></div>
+            <div class="mt-2 text-xs text-slate-500">持仓加权年化: <span class="font-semibold" :class="summary.weightedCAGR >= 0 ? 'text-rose-600' : 'text-emerald-600'">{{ summary.weightedCAGR.toFixed(2) }}%</span></div>
+            <div class="absolute -right-3 -bottom-3 w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center opacity-70">
+                <i data-lucide="target" class="w-8 h-8 text-purple-500"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Asset Allocation Doughnut Chart -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+            <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-500"></i>
+                <span>资产配置比例 (元)</span>
+            </h3>
+            <div class="relative flex-1 min-h-[220px] flex items-center justify-center">
+                <canvas id="assetChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Profit/Loss Ranking Bar Chart -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col">
+            <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-500"></i>
+                <span>各标的浮动/实际获利排行 (前8名)</span>
+            </h3>
+            <div class="relative flex-1 min-h-[220px]">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Action Controls Bar -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col lg:flex-row items-center justify-between gap-4">
+        <!-- Filters Left -->
+        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <!-- Asset Category Filter -->
+            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600">
+                <button v-for="cat in ['全部类别', '场内基金', '场外基金', '股票']" :key="cat"
+                        @click="filterType = cat"
+                        :class="filterType === cat ? 'bg-white text-indigo-600 font-bold shadow-sm' : 'hover:text-slate-900'"
+                        class="px-3 py-1.5 rounded-lg transition">
+                    {{ cat }}
+                </button>
+            </div>
+
+            <!-- Holding Status Filter -->
+            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600">
+                <button v-for="st in ['全部状态', '持有中', '已卖出']" :key="st"
+                        @click="filterStatus = st"
+                        :class="filterStatus === st ? 'bg-white text-indigo-600 font-bold shadow-sm' : 'hover:text-slate-900'"
+                        class="px-3 py-1.5 rounded-lg transition">
+                    {{ st }}
+                </button>
+            </div>
+
+            <span class="text-[11px] text-slate-400 hidden xl:inline-block ml-2">
+                <i data-lucide="info" class="w-3.5 h-3.5 inline mr-0.5"></i>双击任意表格行或点击编辑图标即可直接开启【行内实时编辑】
+            </span>
+        </div>
+
+        <!-- Search Right -->
+        <div class="relative w-full lg:w-72">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" v-model="searchQuery" placeholder="搜索代码、名称、后续跟踪..."
+                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+        </div>
+    </div>
+
+    <!-- Main Investment Data Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[1350px]">
+                <thead>
+                    <tr class="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-xs font-semibold tracking-wider">
+                        <th class="p-4 pl-6 min-w-[170px]">代码 / 名称 / 类别</th>
+                        <th class="p-4 min-w-[120px]">买入日期</th>
+                        <th class="p-4 text-right min-w-[110px]">买入净值</th>
+                        <th class="p-4 text-right min-w-[120px]">投入本金 (元)</th>
+                        <th class="p-4 text-right min-w-[90px]">手续费</th>
+                        <th class="p-4 text-right min-w-[110px]">持有份额</th>
+                        <th class="p-4 text-right min-w-[100px]">最新价</th>
+                        <th class="p-4 text-right min-w-[100px]">卖出价</th>
+                        <th class="p-4 text-center">持有天数</th>
+                        <th class="p-4 text-right">收益率 (%)</th>
+                        <th class="p-4 text-right">独立实际年化</th>
+                        <th v-if="filterType === '股票'" class="p-4 text-right min-w-[130px]">股息率 / 年化分红</th>
+                        <th class="p-4 text-right">获利金额 (元)</th>
+                        <th class="p-4 text-center min-w-[100px]">状态</th>
+                        <th class="p-4 text-right min-w-[110px]">计划加仓</th>
+                        <th class="p-4 text-right min-w-[110px]">清仓后涨跌幅</th>
+                        <th class="p-4 pr-6 text-center min-w-[120px]">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+                    <tr v-if="filteredItems.length === 0">
+                        <td colspan="17" class="p-8 text-center text-slate-400">
+                            <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+                            暂无匹配的投资交易记录
+                        </td>
+                    </tr>
+                    <tr v-for="item in filteredItems" :key="item.id" 
+                        @dblclick="startInlineEdit(item)"
+                        :class="editingRowId === item.id ? 'bg-indigo-50/40 border-y-2 border-indigo-200' : 'hover:bg-slate-50/80'"
+                        class="transition">
+
+                        <!-- Inline Edit Mode Cell Rendering -->
+                        <template v-if="editingRowId === item.id">
+                            <!-- 代码/名称/类别 (Inline) -->
+                            <td class="p-3 pl-6 space-y-1">
+                                <input type="text" v-model="inlineForm.name" placeholder="名称" class="w-full px-2 py-1 bg-white border border-indigo-300 rounded text-xs font-bold focus:ring-1 focus:ring-indigo-500">
+                                <div class="flex gap-1">
+                                    <input type="text" v-model="inlineForm.code" placeholder="代码" class="w-1/2 px-2 py-1 bg-white border border-indigo-300 rounded text-[11px] font-mono">
+                                    <select v-model="inlineForm.type" class="w-1/2 px-1 py-1 bg-white border border-indigo-300 rounded text-[10px]">
+                                        <option value="场内基金">场内</option>
+                                        <option value="场外基金">场外</option>
+                                        <option value="股票">股票</option>
+                                    </select>
+                                </div>
+                            </td>
+
+                            <!-- 买入日期 (Inline) -->
+                            <td class="p-3">
+                                <input type="date" v-model="inlineForm.buyDate" class="w-full px-1.5 py-1 bg-white border border-indigo-300 rounded text-[11px]">
+                            </td>
+
+                            <!-- 买入净值 (Inline) -->
+                            <td class="p-3 text-right">
+                                <input type="number" step="0.0001" v-model.number="inlineForm.buyNav" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
+                            </td>
+
+                            <!-- 投入本金 (Inline) -->
+                            <td class="p-3 text-right">
+                                <input type="number" step="0.01" v-model.number="inlineForm.principal" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono font-semibold text-xs">
+                            </td>
+
+                            <!-- 手续费 (Inline) -->
+                            <td class="p-3 text-right">
+                                <input type="number" step="0.01" v-model.number="inlineForm.buyFee" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
+                            </td>
+
+                            <!-- 持有份额 (Inline) -->
+                            <td class="p-3 text-right">
+                                <input type="number" step="0.01" v-model.number="inlineForm.shares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
+                            </td>
+
+                            <!-- 最新价格 (Inline) -->
+                            <td class="p-3 text-right space-y-1">
+                                <input type="number" step="0.0001" v-model.number="inlineForm.latestPrice" placeholder="最新价" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
+                            </td>
+
+                            <!-- 卖出价格 (Inline) -->
+                            <td class="p-3 text-right space-y-1">
+                                <template v-if="inlineForm.status === '已卖出'">
+                                    <input type="number" step="0.0001" v-model.number="inlineForm.sellPrice" @input="autoCalcInlineRedeem" placeholder="卖出价" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs" title="卖出成交单价">
+                                    <input type="number" step="0.01" min="0" v-model.number="inlineForm.sellFee" @input="autoCalcInlineRedeem" placeholder="手续费" class="w-full text-right px-1.5 py-1 bg-white border border-amber-300 rounded font-mono text-[10px]" title="卖出手续费/交易损耗">
+                                </template>
+                                <template v-else>
+                                    <div class="text-slate-400 text-xs">-</div>
+                                </template>
+                            </td>
+
+                            <!-- 持有天数 (Dynamic preview) -->
+                            <td class="p-3 text-center font-mono text-[11px] text-slate-500">
+                                {{ getItemDays(inlineForm) }} 天
+                            </td>
+
+                            <!-- 卖出/浮动收益率 (Dynamic preview) -->
+                            <td class="p-3 text-right font-mono font-bold" :class="getItemReturnRate(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                {{ getItemReturnRate(inlineForm) >= 0 ? '+' : '' }}{{ (getItemReturnRate(inlineForm) * 100).toFixed(2) }}%
+                            </td>
+
+                            <!-- 独立实际年化 (Dynamic preview) -->
+                            <td class="p-3 text-right font-mono font-bold" :class="getItemCAGR(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                {{ getItemCAGR(inlineForm) >= 0 ? '+' : '' }}{{ getItemCAGR(inlineForm).toFixed(2) }}%
+                            </td>
+
+                            <!-- 股息率 / 年化分红 (Editable inline) 仅在股票tab显示 -->
+                            <td v-if="filterType === '股票'" class="p-3 text-right font-mono font-bold space-y-1">
+                                <template v-if="inlineForm.type === '股票'">
+                                    <div class="flex flex-col items-end gap-1">
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-[10px] text-slate-400">每股分红:</span>
+                                            <input type="number" step="0.001" v-model.number="inlineForm.dividend"
+                                                   class="w-16 text-right px-1 py-0.5 bg-white border border-amber-300 rounded font-mono text-[11px] focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                                                   placeholder="0.000">
+                                        </div>
+                                        <div class="flex items-center gap-1 text-[11px]">
+                                            <!-- YOC 成本股息率（主指标） -->
+                                            <span class="px-1.5 py-0.5 rounded font-extrabold"
+                                                  :class="getDividendYieldOnCost(inlineForm) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'"
+                                                  :title="'买入成本股息率 YOC（按买入价计算）'">
+                                                {{ getDividendYieldOnCost(inlineForm) > 0 ? getDividendYieldOnCost(inlineForm).toFixed(2) + '%' : '-' }}
+                                            </span>
+                                            <!-- 实时股息率（参考） -->
+                                            <span v-if="getDividendYield(inlineForm) > 0 && Math.abs(getDividendYield(inlineForm) - getDividendYieldOnCost(inlineForm)) > 0.01"
+                                                  class="px-1 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200"
+                                                  :title="'实时股息率（按现价计算）'">
+                                                今{{ getDividendYield(inlineForm).toFixed(2) }}%
+                                            </span>
+                                            <span v-if="getItemAnnualDividend(inlineForm) > 0" class="text-emerald-600 font-semibold">
+                                                →¥{{ formatMoney(getItemAnnualDividend(inlineForm)) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <span class="text-slate-300">-</span>
+                                </template>
+                            </td>
+
+                            <!-- 获利金额 (Dynamic preview) + 场外基金累计实收分红输入框 inline editable -->
+                            <td class="p-3 text-right space-y-1.5">
+                                <!-- 主：获利金额预览 -->
+                                <div class="font-mono font-bold text-sm leading-tight"
+                                     :class="getItemProfit(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                    {{ getItemProfit(inlineForm) >= 0 ? '+' : '' }}¥ {{ formatMoney(getItemProfit(inlineForm)) }}
+                                </div>
+                                <!-- 次：获利构成徽标预览（含分红 >0 时显示） -->
+                                <div v-if="inlineForm.type === '场外基金' && inlineForm.status === '已卖出' && inlineForm.dividendReceived && Number(inlineForm.dividendReceived) > 0"
+                                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold whitespace-nowrap bg-emerald-100 border border-emerald-200 text-emerald-700 mx-auto">
+                                    <span>含分红 ¥{{ formatMoney(Number(inlineForm.dividendReceived)) }}</span>
+                                </div>
+                                <!-- 编辑框：场外基金 + 已卖出 → 显示累计实收分红 输入 -->
+                                <div v-if="inlineForm.type === '场外基金' && inlineForm.status === '已卖出'"
+                                     class="flex items-center justify-end gap-1 pt-0.5 border-t border-emerald-100 mt-1">
+                                    <span class="text-[10px] text-emerald-600 font-bold whitespace-nowrap flex items-center gap-0.5" title="持有期间累计实收分红(元)，会计入最终已实现收益">
+                                        <i data-lucide="gift" class="w-2.5 h-2.5"></i>实收分红
+                                    </span>
+                                    <input type="number" step="0.01" min="0"
+                                           v-model.number="inlineForm.dividendReceived"
+                                           placeholder="0.00"
+                                           title="持有期间累计实收分红(元)，自动计入已实现收益"
+                                           class="w-20 text-right px-1.5 py-0.5 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-300 rounded font-mono text-[11px] font-semibold text-emerald-800 placeholder-emerald-400 focus:ring-1 focus:ring-emerald-400 focus:outline-none">
+                                </div>
+                            </td>
+
+                            <!-- 状态 (Inline) -->
+                            <td class="p-3 text-center">
+                                <select v-model="inlineForm.status" class="px-2 py-1 bg-white border border-indigo-300 rounded text-xs font-bold">
+                                    <option value="持有中">持有中</option>
+                                    <option value="已卖出">已卖出</option>
+                                </select>
+                            </td>
+
+                            <!-- 计划加仓 (Inline) -->
+                            <td class="p-3 text-right">
+                                <input type="number" step="100" v-model.number="inlineForm.planAddAmount" class="w-full text-right px-1 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
+                            </td>
+
+                            <!-- 清仓后涨跌幅 (Inline) -->
+                            <td class="p-3 text-right font-mono font-bold" :class="inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice && (inlineForm.latestPrice - inlineForm.sellPrice) >= 0 ? 'text-rose-600' : inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice && (inlineForm.latestPrice - inlineForm.sellPrice) < 0 ? 'text-emerald-600' : 'text-slate-400'">
+                                {{ inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice ? ((inlineForm.latestPrice - inlineForm.sellPrice) / inlineForm.sellPrice >= 0 ? '+' : '') + (((inlineForm.latestPrice - inlineForm.sellPrice) / inlineForm.sellPrice) * 100).toFixed(2) + '%' : '-' }}
+                            </td>
+
+                            <!-- 操作 (Inline Save/Cancel) -->
+                            <td class="p-3 pr-6 text-center">
+                                <div class="flex items-center justify-center space-x-1.5">
+                                    <button @click="saveInlineEdit" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1" title="保存修改">
+                                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                        <span>保存</span>
+                                    </button>
+                                    <button @click="cancelInlineEdit" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition" title="取消编辑">
+                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </template>
+
+                        <!-- Standard Row Display Mode -->
+                        <template v-else>
+                            <!-- 代码/名称/类别 -->
+                            <td class="p-4 pl-6">
+                                <div class="font-bold text-slate-900 text-sm">{{ item.name }}</div>
+                                <div class="flex items-center space-x-2 mt-0.5">
+                                    <span class="font-mono text-slate-500 text-[11px]">{{ item.code }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                          :class="{
+                                              'bg-blue-50 text-blue-600': item.type === '场内基金',
+                                              'bg-amber-50 text-amber-600': item.type === '场外基金',
+                                              'bg-purple-50 text-purple-600': item.type === '股票'
+                                          }">
+                                        {{ item.type }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- 买入日期 -->
+                            <td class="p-4 text-slate-600 font-mono">{{ item.buyDate }}</td>
+
+                            <!-- 买入净值 -->
+                            <td class="p-4 text-right font-mono font-medium">¥ {{ formatNumber(item.buyNav, 4) }}</td>
+
+                            <!-- 投入本金 -->
+                            <td class="p-4 text-right font-mono font-semibold">¥ {{ formatMoney(item.principal) }}</td>
+
+                            <!-- 手续费 -->
+                            <td class="p-4 text-right font-mono text-slate-400">¥ {{ formatMoney(item.buyFee) }}</td>
+
+                            <!-- 持有份额 -->
+                            <td class="p-4 text-right font-mono">{{ formatNumber(item.shares, 2) }}</td>
+
+                            <!-- 最新价格 -->
+                            <td class="p-4 text-right font-mono">
+                                <div class="font-bold text-indigo-600">¥ {{ formatNumber(item.latestPrice, 4) }}</div>
+                                <div class="text-[10px] text-slate-400">实时现价</div>
+                            </td>
+
+                            <!-- 卖出价格 -->
+                            <td class="p-4 text-right font-mono">
+                                <template v-if="item.status === '已卖出'">
+                                    <div class="font-semibold text-amber-600">¥ {{ formatNumber(item.sellPrice, 4) }}</div>
+                                    <div class="text-[10px] text-rose-400">手续费: ¥ {{ formatMoney(item.sellFee || 0) }}</div>
+                                </template>
+                                <template v-else>
+                                    <div class="text-slate-400">-</div>
+                                    <div class="text-[10px] text-slate-400">未卖出</div>
+                                </template>
+                            </td>
+
+                            <!-- 持有天数 -->
+                            <td class="p-4 text-center font-mono">
+                                <span class="px-2 py-1 bg-slate-100 text-slate-700 rounded-md font-medium">
+                                    {{ getItemDays(item) }} 天
+                                </span>
+                            </td>
+
+                            <!-- 卖出/浮动收益率 -->
+                            <td class="p-4 text-right font-mono font-bold" :class="getItemReturnRate(item) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                {{ getItemReturnRate(item) >= 0 ? '+' : '' }}{{ (getItemReturnRate(item) * 100).toFixed(2) }}%
+                            </td>
+
+                            <!-- 独立实际年化 (CAGR) -->
+                            <td class="p-4 text-right font-mono font-bold" :class="getItemCAGR(item) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                <span class="px-2 py-0.5 rounded" :class="getItemCAGR(item) >= 0 ? 'bg-rose-50' : 'bg-emerald-50'">
+                                    {{ getItemCAGR(item) >= 0 ? '+' : '' }}{{ getItemCAGR(item).toFixed(2) }}%
+                                </span>
+                            </td>
+
+                            <!-- 股息率 / 年化分红 (仅股票，且仅在股票tab显示此列) - 主显示成本YOC(按买入价) + 实时估值参考 -->
+                            <td v-if="filterType === '股票'" class="p-4 text-right font-mono font-bold space-y-1">
+                                <template v-if="item.type === '股票'">
+                                    <div class="flex flex-col items-end gap-0.5">
+                                        <div class="flex items-center gap-1">
+                                            <!-- 成本股息率 YOC：按买入价计算，反映该笔投入的真实分红回报率（用户要求） -->
+                                            <span v-if="getDividendYieldOnCost(item) > 0"
+                                                  class="px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-xs font-extrabold"
+                                                  :title="'买入成本股息率 YOC = 每股分红 / 买入价 × 100%'">
+                                                {{ getDividendYieldOnCost(item).toFixed(2) }}%
+                                            </span>
+                                            <!-- 实时股息率：按当前价计算，用于判断当前估值水平（小字参考） -->
+                                            <span v-if="getDividendYield(item) > 0 && Math.abs(getDividendYield(item) - getDividendYieldOnCost(item)) > 0.01"
+                                                  class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold border border-slate-200"
+                                                  :title="'实时股息率 = 每股分红 / 最新价 × 100%'">
+                                                今{{ getDividendYield(item).toFixed(2) }}%
+                                            </span>
+                                        </div>
+                                        <span v-if="getItemAnnualDividend(item) > 0" class="text-emerald-600 font-bold text-[11px]">
+                                            → ¥ {{ formatMoney(getItemAnnualDividend(item)) }}/年
+                                        </span>
+                                        <span v-if="item.dividend && item.dividend > 0" class="text-slate-400 text-[10px]">
+                                            (派{{ Number(item.dividend).toFixed(3) }}/股)
+                                        </span>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <span class="text-slate-300">-</span>
+                                </template>
+                            </td>
+
+                            <!-- 获利金额 / 最终实际获利（场外基金已卖出且有分红时：徽标显示+收益结构提示） -->
+                            <td class="p-4 text-right font-mono font-bold text-sm space-y-1" :class="getItemProfit(item) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                <div class="flex flex-col items-end">
+                                    <div>{{ getItemProfit(item) >= 0 ? '+' : '' }}¥ {{ formatMoney(getItemProfit(item)) }}</div>
+                                    <div v-if="item.type === '场外基金' && item.status === '已卖出' && item.dividendReceived && Number(item.dividendReceived) > 0"
+                                         class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold whitespace-nowrap bg-emerald-100 border border-emerald-200 text-emerald-700"
+                                         :title="'已实现收益结构：\n实际赎回 ¥' + formatMoney(item.sellRedeemAmount || (item.shares*item.sellPrice)) + '\n持有期间实收分红 ¥' + formatMoney(Number(item.dividendReceived)) + '\n原始投入本金 ¥' + formatMoney(item.principal) + '\n───────────────────\n最终获利 = 赎回 + 分红 - 本金 = ' + (getItemProfit(item) >= 0 ? '+' : '') + '¥' + formatMoney(getItemProfit(item))">
+                                        <i data-lucide="gift" class="w-3 h-3 -mt-0.5"></i>
+                                        <span>含分红 ¥{{ formatMoney(Number(item.dividendReceived)) }}</span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 卖出状态 -->
+                            <td class="p-4 text-center">
+                                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center space-x-1"
+                                      :class="item.status === '已卖出' ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-800'">
+                                    <span class="w-1.5 h-1.5 rounded-full" :class="item.status === '已卖出' ? 'bg-slate-500' : 'bg-emerald-500'"></span>
+                                    <span>{{ item.status }}</span>
+                                </span>
+                            </td>
+
+                            <!-- 计划加仓金额 -->
+                            <td class="p-4 text-right font-mono font-semibold text-slate-700">
+                                {{ item.planAddAmount > 0 ? '¥ ' + formatMoney(item.planAddAmount) : '-' }}
+                            </td>
+
+                            <!-- 清仓后涨跌幅 -->
+                            <td class="p-4 text-right font-mono font-bold" :class="item.status === '已卖出' && item.sellPrice && item.latestPrice && (item.latestPrice - item.sellPrice) >= 0 ? 'text-rose-600' : item.status === '已卖出' && item.sellPrice && item.latestPrice && (item.latestPrice - item.sellPrice) < 0 ? 'text-emerald-600' : 'text-slate-400'">
+                                {{ item.status === '已卖出' && item.sellPrice && item.latestPrice ? ((item.latestPrice - item.sellPrice) / item.sellPrice >= 0 ? '+' : '') + (((item.latestPrice - item.sellPrice) / item.sellPrice) * 100).toFixed(2) + '%' : '-' }}
+                            </td>
+
+                            <!-- 操作按键 -->
+                            <td class="p-4 pr-6 text-center">
+                                <div class="flex items-center justify-center space-x-2">
+                                    <button @click="startInlineEdit(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="开启行内编辑">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click="openModal(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="弹窗全面编辑">
+                                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click="quickSellToggle(item)" class="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-100 rounded-lg transition" :title="item.status === '持有中' ? '设为清仓卖出' : '还原为持有中'">
+                                        <i data-lucide="circle-dollar-sign" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click="openDeleteConfirm(item)" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition" title="删除记录">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add / Edit Record Modal -->
+    <div v-if="modalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden my-8 transform transition-all">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                    <i data-lucide="file-text" class="w-5 h-5 text-indigo-600"></i>
+                    <span>{{ editingItem.id ? '编辑投资交易' : '新增买入记录' }}</span>
+                </h3>
+                <button @click="modalOpen = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form @submit.prevent="saveItem" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 代码 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">基金/股票代码 *</label>
+                        <input type="text" v-model="form.code" required placeholder="如 000001 / 510300"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 名称 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">标的名称 *</label>
+                        <input type="text" v-model="form.name" required placeholder="如 平安银行 / 沪深300ETF"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 资产类别 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">资产类别 *</label>
+                        <select v-model="form.type" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="场内基金">场内基金 (ETF/LOF)</option>
+                            <option value="场外基金">场外基金 (开放式)</option>
+                            <option value="股票">股票</option>
+                        </select>
+                    </div>
+
+                    <!-- 买入日期 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">买入日期 *</label>
+                        <input type="date" v-model="form.buyDate" required
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 买入时单位净值/价格 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">买入单位净值(元) *</label>
+                        <input type="number" step="0.0001" v-model.number="form.buyNav" @input="autoCalcShares" required placeholder="0.0000"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 投入本金 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">投入本金(元) *</label>
+                        <input type="number" step="0.01" v-model.number="form.principal" @input="autoCalcShares" required placeholder="0.00"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 买入手续费 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">买入手续费(元)</label>
+                        <input type="number" step="0.01" v-model.number="form.buyFee" @input="autoCalcShares" placeholder="0.00"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 持有份额 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">持有份额 *</label>
+                        <input type="number" step="0.01" v-model.number="form.shares" required placeholder="自动计算或手动修正"
+                               class="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 最新价格 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">最新现价/净值(元) *</label>
+                        <input type="number" step="0.0001" v-model.number="form.latestPrice" required placeholder="0.0000"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- 股息率 / 每股年度分红 (仅股票) - 直接从腾讯行情接口派生，零额外请求 -->
+                    <div v-if="form.type === '股票'" class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500"></i>
+                            每股年度分红(元/股)
+                            <span class="text-emerald-500 font-normal text-[11px] ml-1">【腾讯行情接口自动派生 · 零额外请求】</span>
+                        </label>
+                        <div class="flex gap-2 items-start">
+                            <input type="number" step="0.001" v-model.number="form.dividend" placeholder="点击「一键刷新现价」自动拉取" readonly
+                                   class="flex-1 px-3 py-2 border border-emerald-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-400 focus:outline-none bg-emerald-50/60 font-mono cursor-not-allowed">
+                            <div class="flex flex-col items-end gap-0.5 text-right whitespace-nowrap">
+                                <!-- 成本股息率 YOC：按买入价计算（主显示，对用户最有意义） -->
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[10px] text-slate-500">YOC 成本股息率</span>
+                                    <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-mono font-extrabold text-sm"
+                                          :title="'按买入价 ' + (form.buyNav||'-') + ' 计算，反映您这笔真实投入的分红回报'">
+                                        {{ getDividendYieldOnCost(form) > 0 ? getDividendYieldOnCost(form).toFixed(2) + '%' : '-' }}
+                                    </span>
+                                </div>
+                                <!-- 实时股息率（小字参考，反映当前市场估值） -->
+                                <div v-if="getDividendYield(form) > 0 && Math.abs(getDividendYield(form) - getDividendYieldOnCost(form)) > 0.01"
+                                     class="flex items-center gap-1">
+                                    <span class="text-[10px] text-slate-400">实时股息率(今)</span>
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono font-semibold text-xs border border-slate-200"
+                                          :title="'按最新价 ' + (form.latestPrice||'-') + ' 计算，用于判断当前估值水平'">
+                                        {{ getDividendYield(form).toFixed(2) }}%
+                                    </span>
+                                </div>
+                                <span v-if="getItemAnnualDividend(form) > 0" class="text-[10px] text-emerald-600 font-bold">
+                                    预计分红 ¥{{ formatMoney(getItemAnnualDividend(form)) }}/年
+                                </span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                            <i data-lucide="info" class="w-3 h-3 inline mr-0.5 -mt-0.5"></i>
+                            数据来源：腾讯 qt.gtimg.cn 接口「第 64 号字段 TTM 股息率」× 当前价 ÷ 100 = 每股年度分红。<b class="text-amber-600">YOC 成本股息率</b> = 每股分红 / 买入价（反映您这笔投入实际能到手的分红回报）。点击左上角「一键刷新现价」同步所有数据，如需手动微调请双击表格对应行。
+                        </p>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 my-2">
+
+                <!-- 卖出与赎回设置区 -->
+                <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700">卖出/清仓状态控制</span>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" v-model="form.isSold" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                            <span class="text-xs font-semibold text-slate-700">是否已完全卖出清仓</span>
+                        </label>
+                    </div>
+
+                    <div v-if="form.isSold" class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">卖出日期</label>
+                            <input type="date" v-model="form.sellDate" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">卖出成交价格(元)</label>
+                            <input type="number" step="0.0001" v-model.number="form.sellPrice" @input="autoCalcRedeem" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">卖出手续费/损耗(元)</label>
+                            <input type="number" step="0.01" min="0" v-model.number="form.sellFee" @input="autoCalcRedeem" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs" placeholder="佣金+印花税">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">实际赎回到账金额(元)</label>
+                            <input type="number" step="0.01" v-model.number="form.sellRedeemAmount" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs" placeholder="扣除手续费后到账">
+                        </div>
+                        <!-- 场外基金：持有期间累计实收分红（卖出后真实收益需计入此项） -->
+                        <div v-if="form.type === '场外基金'" class="md:col-span-4">
+                            <label class="block text-[11px] font-semibold text-emerald-700 mb-1 flex items-center gap-1.5">
+                                <i data-lucide="gift" class="w-3.5 h-3.5"></i>
+                                持有期间累计实收分红(元)
+                                <span class="text-slate-400 font-normal">· 场外基金分红派息汇总，会自动计入「已实现收益」</span>
+                            </label>
+                            <div class="relative">
+                                <input type="number" step="0.01" min="0" v-model.number="form.dividendReceived" class="w-full px-3 py-2 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-xl text-sm font-semibold text-emerald-800 font-mono placeholder-emerald-400 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400" placeholder="如：1250.50 = 持有期间多次分红累计到账金额">
+                                <div v-if="form.dividendReceived > 0 && form.sellRedeemAmount" class="mt-1.5 flex items-center gap-2 text-[11px]">
+                                    <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">
+                                        已实现收益 = {{ formatMoney(Number(form.sellRedeemAmount)) }}(赎回) + {{ formatMoney(Number(form.dividendReceived)) }}(分红) - {{ formatMoney(Number(form.principal)) }}(本金) = 
+                                        <span class="font-extrabold font-mono" :class="(Number(form.sellRedeemAmount) + Number(form.dividendReceived) - Number(form.principal)) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                            {{ (Number(form.sellRedeemAmount) + Number(form.dividendReceived) - Number(form.principal)) >= 0 ? '+' : '' }}¥{{ formatMoney(Number(form.sellRedeemAmount) + Number(form.dividendReceived) - Number(form.principal)) }}
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 计划加仓与后续跟踪 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">计划加仓金额(元)</label>
+                        <input type="number" step="100" v-model.number="form.planAddAmount" placeholder="如 5000"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex items-center justify-end space-x-3 pt-3">
+                    <button type="button" @click="modalOpen = false" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50">
+                        取消
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-100">
+                        保存记录
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- AI Diagnosis & Market Query Modal -->
+    <div v-if="aiModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden my-8">
+            <div class="px-6 py-4 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-purple-600"></i>
+                    <h3 class="text-base font-bold text-purple-950">Gemini 智能投资组合诊断与行情分析</h3>
+                </div>
+                <button @click="aiModalOpen = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div v-if="aiLoading" class="text-center py-12 space-y-3">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent"></div>
+                    <p class="text-sm font-medium text-slate-600">正在分析您的持仓配置并检索最新市场行情...</p>
+                </div>
+
+                <div v-else-if="aiResult" class="prose prose-sm max-w-none text-slate-700 space-y-3 leading-relaxed whitespace-pre-line">
+                    <div class="bg-purple-50/50 p-4 rounded-2xl border border-purple-100 text-xs text-purple-900">
+                        {{ aiResult }}
+                    </div>
+                </div>
+
+                <div v-else class="text-center py-8 text-slate-500 text-xs">
+                    点击下方按钮，让 Gemini AI 结合您当前的所有持仓进行风险暴露分析、行业集中度评估与操作建议。
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                <span class="text-[11px] text-slate-400">模型: gemini-3-flash-preview (实时搜索增强)</span>
+                <button @click="runAiAnalysis" :disabled="aiLoading" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-purple-100 disabled:opacity-50">
+                    {{ aiLoading ? '诊断中...' : '生成最新诊断报告' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Off-Market Fund Price Edit Modal -->
+    <div v-if="offMarketFundModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden my-8 max-h-[80vh]">
+            <div class="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="pencil" class="w-5 h-5 text-amber-600"></i>
+                    <h3 class="text-base font-bold text-amber-950">批量编辑场外基金价格</h3>
+                </div>
+                <button @click="closeOffMarketFundModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <div class="space-y-3">
+                    <div v-for="fund in offMarketFundsForEdit" :key="fund.id" class="flex items-center space-x-4 p-3 bg-slate-50 rounded-xl">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold">场外基金</span>
+                                <span class="font-bold text-slate-900">{{ fund.name }}</span>
+                                <span class="text-xs text-slate-400">{{ fund.code }}</span>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1">
+                                当前净值: <span class="font-mono">{{ fund.latestPrice ? fund.latestPrice.toFixed(4) : '-' }}</span>
+                            </div>
+                        </div>
+                        <div class="w-32">
+                            <input type="number" step="0.0001" v-model.number="fund.editPrice" 
+                                   placeholder="输入净值"
+                                   class="w-full text-right px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-if="offMarketFundsForEdit.length === 0" class="text-center py-8 text-slate-500 text-sm">
+                    暂无场外基金记录
+                </div>
+            </div>
+            
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end items-center space-x-3">
+                <button @click="closeOffMarketFundModal" class="px-5 py-2 text-slate-600 hover:text-slate-900 rounded-xl text-sm font-semibold">
+                    取消
+                </button>
+                <button @click="saveOffMarketFundPrices" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-amber-100">
+                    保存修改
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div v-if="deleteConfirmModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden my-8">
+            <div class="px-6 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
+                    <h3 class="text-base font-bold text-rose-950">确认删除</h3>
+                </div>
+                <button @click="closeDeleteConfirm" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center">
+                        <i data-lucide="trash-2" class="w-6 h-6 text-rose-500"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">确定要删除这条记录吗？</p>
+                        <p class="text-xs text-slate-500 mt-1">此操作不可撤销</p>
+                    </div>
+                </div>
+
+                <div v-if="itemToDelete" class="bg-slate-50 rounded-xl p-4">
+                    <div class="text-xs text-slate-500 mb-2">即将删除的记录：</div>
+                    <div class="font-bold text-slate-800 text-sm">{{ itemToDelete.name }}</div>
+                    <div class="text-xs text-slate-500 font-mono">{{ itemToDelete.code }}</div>
+                    <div class="text-xs text-slate-400 mt-1">
+                        投入本金: ¥{{ formatMoney(itemToDelete.principal) }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
+                <button @click="closeDeleteConfirm" class="px-5 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50">
+                    取消
+                </button>
+                <button @click="confirmDelete" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-rose-100">
+                    <i data-lucide="trash-2" class="w-4 h-4 inline mr-1"></i>
+                    确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Data Modal -->
+    <div v-if="importModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden my-8">
+            <div class="px-6 py-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="upload" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-base font-bold text-indigo-950">导入 JSON 数据</h3>
+                </div>
+                <button @click="importModalOpen = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div class="text-xs text-slate-500">
+                    请粘贴 JSON 格式的数据内容。您可以先下载样板数据作为参考格式。
+                </div>
+
+                <textarea v-model="importJsonText" 
+                          class="w-full h-64 px-4 py-3 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                          placeholder="请粘贴 JSON 数据...&#10;&#10;示例格式：&#10;[&#10;  {&#10;    &quot;id&quot;: &quot;1&quot;,&#10;    &quot;code&quot;: &quot;510300&quot;,&#10;    &quot;name&quot;: &quot;沪深300ETF&quot;,&#10;    &quot;type&quot;: &quot;场内基金&quot;,&#10;    &quot;buyDate&quot;: &quot;2024-01-15&quot;,&#10;    &quot;buyNav&quot;: 3.85,&#10;    &quot;principal&quot;: 10000,&#10;    &quot;buyFee&quot;: 5,&#10;    &quot;shares&quot;: 2596.10,&#10;    &quot;latestPrice&quot;: 4.12,&#10;    &quot;status&quot;: &quot;持有中&quot;&#10;  }&#10;]"></textarea>
+
+                <div v-if="importStatus" class="text-xs p-3 rounded-xl" :class="importStatusClass">
+                    <i :class="importStatusIcon" class="w-4 h-4 inline mr-1"></i>
+                    {{ importStatus }}
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center space-x-3">
+                <button @click="clearImportText" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50">
+                    清空内容
+                </button>
+                <div class="flex space-x-2">
+                    <button @click="loadSampleDataToEditor" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50">
+                        <i data-lucide="file-text" class="w-4 h-4 inline mr-1"></i>
+                        加载样板数据
+                    </button>
+                    <button @click="submitImportData" :disabled="!importJsonText.trim()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-100 disabled:opacity-50">
+                        <i data-lucide="check" class="w-4 h-4 inline mr-1"></i>
+                        导入数据
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dividend Summary Modal: 综合股息率 · 年化分红（仅股票tab按钮打开，非主功能） -->
+    <div v-if="dividendModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-start md:items-center justify-center z-50 p-3 md:p-6 overflow-y-auto">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-6xl overflow-hidden my-4">
+            <!-- Header -->
+            <div class="px-5 md:px-6 py-4 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 border-b border-amber-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-100">
+                        <i data-lucide="coins" class="w-4.5 h-4.5 text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">持有股票综合股息率 · 年化分红汇总</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5">YOC=买入成本股息率 | 今=按当前市价计算的实时股息率</p>
+                    </div>
+                </div>
+                <button @click="closeDividendModal" class="text-slate-400 hover:text-slate-700 hover:bg-white p-1.5 rounded-xl transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Summary Top Stats -->
+            <div v-if="stockDividendSummary.stocks.length > 0" class="px-5 md:px-6 py-4 flex flex-wrap gap-3 border-b border-slate-100 bg-slate-50/40">
+                <div class="bg-amber-50 rounded-xl px-4 py-2.5 border border-amber-100">
+                    <div class="text-[10px] text-amber-600 font-semibold">组合预计年化分红</div>
+                    <div class="font-extrabold text-amber-700 text-xl font-mono leading-tight">¥ {{ formatMoney(stockDividendSummary.totalAnnualDividend) }}</div>
+                </div>
+                <div class="bg-emerald-50 rounded-xl px-4 py-2.5 border border-emerald-100">
+                    <div class="text-[10px] text-emerald-600 font-semibold">分红收益率 (对本金)</div>
+                    <div class="font-extrabold text-emerald-700 text-lg font-mono leading-tight">
+                        {{ stockDividendSummary.annualDivYield.toFixed(2) }}<span class="text-sm">%</span>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl px-4 py-2.5 border border-slate-200">
+                    <div class="text-[10px] text-slate-500 font-semibold">持有股票数 / 买入总笔数</div>
+                    <div class="font-bold text-slate-800 text-lg leading-tight">
+                        {{ stockDividendSummary.stocks.length }} 只
+                        <span class="text-slate-400 text-xs font-semibold">
+                            / {{ stockDividendSummary.stocks.reduce((s,x)=>s+x.records.length,0) }} 笔
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Body Content -->
+            <div class="p-5 md:p-6">
+                <div v-if="stockDividendSummary.stocks.length === 0" class="py-12 text-center text-slate-400 text-xs">
+                    <i data-lucide="landmark" class="w-12 h-12 mx-auto mb-3 opacity-40"></i>
+                    <div class="text-sm font-semibold text-slate-500 mb-1">暂无持有中的股票记录</div>
+                    <div>请先切换到「全部类别」或新增股票持仓记录</div>
+                </div>
+
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div v-for="stock in stockDividendSummary.stocks" :key="stock.code"
+                         class="bg-gradient-to-br from-amber-50/50 to-white border border-amber-100 rounded-2xl p-4 space-y-3">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <div class="font-bold text-slate-900 text-sm">{{ stock.name }}</div>
+                                <div class="font-mono text-slate-500 text-[11px]">{{ stock.code }}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] text-slate-400 font-semibold">预计年化分红</div>
+                                <div class="text-xl font-extrabold text-amber-600 font-mono">
+                                    ¥ {{ formatMoney(stock.totalAnnualDividend) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-2 text-center">
+                            <div class="bg-white rounded-lg py-2 border border-slate-100">
+                                <div class="text-[10px] text-slate-400">买入次数</div>
+                                <div class="font-bold text-slate-800 text-sm">{{ stock.records.length }}</div>
+                            </div>
+                            <div class="bg-white rounded-lg py-2 border border-slate-100">
+                                <div class="text-[10px] text-slate-400">总持仓</div>
+                                <div class="font-bold text-slate-800 text-sm">{{ formatNumber(stock.totalShares, 0) }}</div>
+                            </div>
+                            <div class="bg-white rounded-lg py-2 border border-slate-100" :title="'综合股息率(YOC)=按各次买入价为基础的本金加权平均'">
+                                <div class="text-[10px] text-amber-500 font-semibold">综合YOC</div>
+                                <div class="font-bold text-amber-600 text-sm">{{ stock.compositeYield.toFixed(2) }}%</div>
+                            </div>
+                            <div class="bg-white rounded-lg py-2 border border-slate-100">
+                                <div class="text-[10px] text-slate-400">本金分红率</div>
+                                <div class="font-bold text-emerald-600 text-sm">{{ stock.annualDivYield.toFixed(2) }}%</div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-amber-100 pt-2">
+                            <div class="text-[10px] font-semibold text-slate-500 mb-1.5 flex items-center justify-between">
+                                <span>历次买入明细</span>
+                                <span class="font-normal text-slate-400">成本YOC / 实时股息率</span>
+                            </div>
+                            <div class="space-y-1 max-h-[160px] overflow-y-auto">
+                                <div v-for="(rec, idx) in stock.records" :key="rec.id"
+                                     class="flex items-center justify-between text-[11px] py-1 px-2 bg-white/60 rounded">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-slate-400 font-mono">{{ rec.buyDate }}</span>
+                                        <span class="text-slate-500">@¥{{ formatNumber(rec.buyNav, 2) }}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1.5">
+                                        <span class="text-slate-400">{{ formatNumber(rec.shares, 0) }}股</span>
+                                        <span v-if="rec.dividendPerShare > 0" class="text-slate-500 whitespace-nowrap">派{{ rec.dividendPerShare.toFixed(3) }}→¥{{ formatMoney(rec.annualDividend) }}</span>
+                                        <!-- 买入成本股息率 YOC（主指标） -->
+                                        <span class="px-1.5 py-0.5 rounded font-bold whitespace-nowrap"
+                                              :class="rec.dividendYieldYOC > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'">
+                                            {{ rec.dividendYieldYOC > 0 ? rec.dividendYieldYOC.toFixed(2) + '%' : '-' }}
+                                        </span>
+                                        <!-- 实时股息率（参考） -->
+                                        <span v-if="rec.dividendYieldLive && Math.abs(rec.dividendYieldLive - rec.dividendYieldYOC) > 0.01"
+                                              class="px-1.5 py-0.5 rounded font-semibold whitespace-nowrap text-[10px] border border-slate-200 text-slate-500 bg-slate-50">
+                                            今:{{ rec.dividendYieldLive.toFixed(2) }}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-5 md:px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <div>
+                    <i data-lucide="info" class="w-3.5 h-3.5 inline mr-1 -mt-0.5"></i>
+                    YOC = 每股分红 ÷ 买入价（真实投入回报），不随行情波动
+                </div>
+                <button @click="closeDividendModal" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-semibold text-sm transition">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gitee Sync Modal -->
+    <div v-if="giteeModalOpen" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden my-8">
+            <div class="px-6 py-4 bg-orange-50 border-b border-orange-100 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="cloud" class="w-5 h-5 text-orange-600"></i>
+                    <h3 class="text-base font-bold text-orange-950">Gitee 云端同步</h3>
+                </div>
+                <button @click="giteeModalOpen = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div class="text-xs text-slate-500">
+                    基于 Gitee OpenAPI，将您的投资组合数据安全同步到私人仓库。
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Gitee 个人令牌</label>
+                        <input type="password" v-model="giteeConfig.token" placeholder="在Gitee设置中生成的Token" 
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none font-mono">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
+                            <input type="text" v-model="giteeConfig.user" placeholder="Gitee用户名" 
+                                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仓库名</label>
+                            <input type="text" v-model="giteeConfig.repo" placeholder="私人仓库名" 
+                                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="giteeStatus" class="text-xs p-3 rounded-xl" :class="giteeStatusClass">
+                    <i :class="giteeStatusIcon" class="w-4 h-4 inline mr-1"></i>
+                    {{ giteeStatus }}
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center space-x-3">
+                <a href="https://gitee.com/profile/personal_access_tokens" target="_blank" class="text-[11px] text-slate-500 hover:text-orange-600">
+                    前往获取令牌
+                </a>
+                <div class="flex space-x-2">
+                    <button @click="downloadFromGitee" :disabled="giteeSyncing" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                        <i data-lucide="download" class="w-4 h-4 inline mr-1"></i>
+                        从云端恢复
+                    </button>
+                    <button @click="uploadToGitee" :disabled="giteeSyncing" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-orange-100 disabled:opacity-50">
+                        <i data-lucide="upload" class="w-4 h-4 inline mr-1"></i>
+                        {{ giteeSyncing ? '同步中...' : '备份到云端' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+
+createApp({
+    setup() {
+        // Core State
+        const items = ref([]);
+        const filterType = ref('全部类别');
+        const filterStatus = ref('全部状态');
+        const searchQuery = ref('');
+
+        // Inline Edit State
+        const editingRowId = ref(null);
+        const inlineForm = ref({});
+
+        const modalOpen = ref(false);
+        const isRefreshing = ref(false);
+        const aiModalOpen = ref(false);
+        const aiLoading = ref(false);
+        const aiResult = ref('');
+
+        // Dividend Summary Modal (仅当股票tab时，点击按钮打开)
+        const dividendModalOpen = ref(false);
+        const openDividendModal = () => { dividendModalOpen.value = true; nextTick(() => { if (window.lucide) lucide.createIcons(); }); };
+        const closeDividendModal = () => { dividendModalOpen.value = false; };
+
+        // Import Modal State
+        const importModalOpen = ref(false);
+        const importJsonText = ref('');
+        const importStatus = ref('');
+        const importStatusType = ref('');
+
+        // Off-Market Fund Price Edit Modal State
+        const offMarketFundModalOpen = ref(false);
+        const offMarketFundsForEdit = ref([]);
+
+        // Delete Confirm Modal State
+        const deleteConfirmModalOpen = ref(false);
+        const itemToDelete = ref(null);
+
+        // Gitee Sync State
+        const giteeModalOpen = ref(false);
+        const giteeSyncing = ref(false);
+        const giteeStatus = ref('');
+        const giteeStatusType = ref('');
+        const giteeConfig = ref({
+            token: '',
+            user: '',
+            repo: 'my-portfolio-data'
+        });
+
+        // Form state
+        const editingItem = ref({});
+        const form = ref({
+            code: '',
+            name: '',
+            type: '场内基金',
+            buyDate: new Date().toISOString().split('T')[0],
+            buyNav: null,
+            principal: null,
+            buyFee: 0,
+            shares: null,
+            latestPrice: null,
+            dividend: null,        // 股票：每股年度分红
+            dividendReceived: null,// 场外基金：持有期间累计实收分红金额(元)
+            isSold: false,
+            sellDate: new Date().toISOString().split('T')[0],
+            sellPrice: null,
+            sellFee: 0,
+            sellRedeemAmount: null,
+            planAddAmount: 0
+        });
+
+        // Chart Instances
+        let assetChartInstance = null;
+        let profitChartInstance = null;
+
+        // Sample initial dataset
+        const defaultSampleData = [
+            {
+                id: '1',
+                code: '510300',
+                name: '沪深300ETF',
+                type: '场内基金',
+                buyDate: '2023-05-15',
+                buyNav: 3.8500,
+                principal: 10000,
+                buyFee: 5,
+                shares: 2596.10,
+                latestPrice: 4.1200,
+                status: '持有中',
+                sellDate: '',
+                sellPrice: null,
+                sellRedeemAmount: null,
+                planAddAmount: 5000,
+                followUp: '按月定投，突破箱体可分批加仓'
+            },
+            {
+                id: '2',
+                code: '110011',
+                name: '易方达中小盘',
+                type: '场外基金',
+                buyDate: '2022-11-10',
+                buyNav: 2.1500,
+                principal: 15000,
+                buyFee: 15,
+                shares: 6969.76,
+                latestPrice: 2.4800,
+                status: '持有中',
+                sellDate: '',
+                sellPrice: null,
+                sellRedeemAmount: null,
+                planAddAmount: 0,
+                followUp: '消费反弹拉升，长期持有'
+            },
+            {
+                id: '3',
+                code: '600519',
+                name: '贵州茅台',
+                type: '股票',
+                buyDate: '2023-01-05',
+                buyNav: 1720.0000,
+                principal: 172000,
+                buyFee: 50,
+                shares: 100,
+                latestPrice: 1680.0000,
+                dividend: 25.91,
+                status: '持有中',
+                sellDate: '',
+                sellPrice: null,
+                sellRedeemAmount: null,
+                planAddAmount: 20000,
+                followUp: '核心白马股，逢低分批吸筹'
+            },
+            {
+                id: '4',
+                code: '000001',
+                name: '平安银行',
+                type: '股票',
+                buyDate: '2021-06-01',
+                buyNav: 18.5000,
+                principal: 18500,
+                buyFee: 10,
+                shares: 1000,
+                latestPrice: 11.2000,
+                status: '已卖出',
+                sellDate: '2023-08-10',
+                sellPrice: 12.5000,
+                sellFee: 20,
+                sellRedeemAmount: 12480,
+                planAddAmount: 0,
+                followUp: '及时止损调仓换股'
+            }
+        ];
+
+        // Calculate holding days
+        const getItemDays = (item) => {
+            if (item.days != null && !isNaN(item.days)) return item.days;
+            if (!item.buyDate) return 1;
+            const start = new Date(item.buyDate);
+            const end = item.status === '已卖出' && item.sellDate ? new Date(item.sellDate) : new Date();
+            const diffTime = Math.max(0, end - start);
+            const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return days < 1 ? 1 : days;
+        };
+
+        const getItemReturnRate = (item) => {
+            if (item.returnRate != null && !isNaN(item.returnRate)) return item.returnRate;
+            if (item.status === '已卖出') {
+                const redeem = item.sellRedeemAmount || (item.shares * item.sellPrice);
+                return item.principal > 0 ? (redeem - item.principal) / item.principal : 0;
+            } else {
+                const currentVal = item.shares * item.latestPrice;
+                return item.principal > 0 ? (currentVal - item.principal) / item.principal : 0;
+            }
+        };
+
+        const getPostSellChange = (item) => {
+            if (item.postSellChange != null && !isNaN(item.postSellChange)) return item.postSellChange;
+            if (item.status !== '已卖出' || !item.sellPrice || !item.latestPrice) return 0;
+            return (item.latestPrice - item.sellPrice) / item.sellPrice;
+        };
+
+        const getItemCAGR = (item) => {
+            if (item.cagr != null && !isNaN(item.cagr)) return item.cagr;
+            const days = getItemDays(item);
+            const totalReturn = getItemReturnRate(item);
+            if (days <= 0 || totalReturn <= -1) return 0;
+            const annual = (Math.pow(1 + totalReturn, 365 / days) - 1) * 100;
+            if (isNaN(annual)) return 0;
+            return Math.min(Math.max(annual, -99.99), 999.99);
+        };
+
+        const getDividendYield = (item) => {
+            if (item.dividendYield != null && !isNaN(item.dividendYield)) return item.dividendYield;
+            const dividend = Number(item.dividend || 0);
+            const price = Number(item.latestPrice || item.buyNav || 0);
+            if (price <= 0) return 0;
+            return (dividend / price) * 100;
+        };
+
+        const getDividendYieldOnCost = (item) => {
+            if (item.yoc != null && !isNaN(item.yoc)) return item.yoc;
+            const dividend = Number(item.dividend || 0);
+            const cost = Number(item.buyNav || item.latestPrice || 0);
+            if (cost <= 0) return 0;
+            return (dividend / cost) * 100;
+        };
+
+        const getItemAnnualDividend = (item) => {
+            if (item.annualDividend != null && !isNaN(item.annualDividend)) return item.annualDividend;
+            const shares = Number(item.shares || 0);
+            const dividend = Number(item.dividend || 0);
+            return shares * dividend;
+        };
+
+        const getItemProfit = (item) => {
+            if (item.profit != null && !isNaN(item.profit)) return item.profit;
+            if (item.status === '已卖出') {
+                const redeem = item.sellRedeemAmount || (item.shares * item.sellPrice);
+                const dividend = (item.type === '场外基金' && item.dividendReceived) ? Number(item.dividendReceived) : 0;
+                return redeem + dividend - item.principal;
+            } else {
+                return (item.shares * item.latestPrice) - item.principal;
+            }
+        };
+
+        // Filtered List
+        const filteredItems = computed(() => {
+            return items.value.filter(item => {
+                const matchType = filterType.value === '全部类别' || item.type === filterType.value;
+                const matchStatus = filterStatus.value === '全部状态' || item.status === filterStatus.value;
+                const q = searchQuery.value.trim().toLowerCase();
+                const matchQuery = !q || item.code.toLowerCase().includes(q) ||
+                                   item.name.toLowerCase().includes(q);
+                return matchType && matchStatus && matchQuery;
+            });
+        });
+
+        // Portfolio Global Summary
+        const summary = computed(() => {
+            let totalPrincipal = 0;
+            let holdingPrincipal = 0;
+            let soldPrincipal = 0;
+            let holdingMarketValue = 0;
+            let unrealizedProfit = 0;
+            let realizedProfit = 0;
+            let totalPlanAdd = 0;
+            let holdingCount = 0;
+            let soldCount = 0;
+            let cagrSum = 0;
+
+            items.value.forEach(item => {
+                totalPrincipal += Number(item.principal || 0);
+                totalPlanAdd += Number(item.planAddAmount || 0);
+
+                if (item.status === '持有中') {
+                    holdingCount++;
+                    holdingPrincipal += Number(item.principal || 0);
+                    const mv = Number(item.shares || 0) * Number(item.latestPrice || 0);
+                    holdingMarketValue += mv;
+                    unrealizedProfit += (mv - Number(item.principal || 0));
+                    cagrSum += getItemCAGR(item) * Number(item.principal || 0);
+                } else {
+                    soldCount++;
+                    soldPrincipal += Number(item.principal || 0);
+                    const profit = getItemProfit(item);
+                    realizedProfit += profit;
+                }
+            });
+
+            const unrealizedRate = holdingPrincipal > 0 ? unrealizedProfit / holdingPrincipal : 0;
+            const weightedCAGR = holdingPrincipal > 0 ? cagrSum / holdingPrincipal : 0;
+
+            return {
+                totalPrincipal,
+                holdingPrincipal,
+                soldPrincipal,
+                holdingMarketValue,
+                unrealizedProfit,
+                unrealizedRate,
+                realizedProfit,
+                totalPlanAdd,
+                holdingCount,
+                soldCount,
+                weightedCAGR
+            };
+        });
+
+        const stockDividendSummary = computed(() => {
+            const stockMap = new Map();
+            items.value.forEach(item => {
+                if (item.type !== '股票' || item.status !== '持有中') return;
+                const code = (item.code || '').trim();
+                if (!code) return;
+                if (!stockMap.has(code)) {
+                    stockMap.set(code, {
+                        code: code,
+                        name: item.name,
+                        records: [],
+                        totalShares: 0,
+                        totalPrincipal: 0,
+                        totalDividendWeight: 0,
+                        totalAnnualDividend: 0,
+                        totalMarketValue: 0
+                    });
+                }
+                const entry = stockMap.get(code);
+                // 单次买入记录用 YOC 成本股息率 = 分红/买入价 (反映该笔投入真实回报率)
+                const dyYOC = getDividendYieldOnCost(item);
+                const dyLive = getDividendYield(item);
+                const annualDiv = getItemAnnualDividend(item);
+                const principal = Number(item.principal || 0);
+                const shares = Number(item.shares || 0);
+                const price = Number(item.latestPrice || item.buyNav || 0);
+                entry.records.push({
+                    id: item.id,
+                    buyDate: item.buyDate,
+                    buyNav: item.buyNav,
+                    shares: shares,
+                    principal: principal,
+                    dividendYieldYOC: dyYOC,     // ✅ 改名：买入成本YOC口径股息率 (避免与脏字段dividendYield混淆)
+                    dividendYieldLive: dyLive,   // 实时市价口径股息率
+                    dividendPerShare: Number(item.dividend || 0),
+                    latestPrice: price,
+                    annualDividend: annualDiv
+                });
+                entry.totalShares += shares;
+                entry.totalPrincipal += principal;
+                // 综合股息率按本金加权，使用 YOC 更能反映真实综合投入回报
+                entry.totalDividendWeight += dyYOC * principal;
+                entry.totalAnnualDividend += annualDiv;
+                entry.totalMarketValue += shares * price;
+            });
+
+            let portfolioAnnualDividend = 0;
+            let portfolioPrincipal = 0;
+
+            const result = [];
+            stockMap.forEach(entry => {
+                const compositeYield = entry.totalPrincipal > 0
+                    ? entry.totalDividendWeight / entry.totalPrincipal
+                    : 0;
+                const annualDivYield = entry.totalPrincipal > 0
+                    ? (entry.totalAnnualDividend / entry.totalPrincipal) * 100
+                    : 0;
+                entry.compositeYield = compositeYield;
+                entry.annualDivYield = annualDivYield;
+                entry.records.sort((a, b) => new Date(a.buyDate) - new Date(b.buyDate));
+                portfolioAnnualDividend += entry.totalAnnualDividend;
+                portfolioPrincipal += entry.totalPrincipal;
+                result.push(entry);
+            });
+            result.sort((a, b) => b.totalAnnualDividend - a.totalAnnualDividend);
+
+            const portfolioAnnualDivYield = portfolioPrincipal > 0
+                ? (portfolioAnnualDividend / portfolioPrincipal) * 100
+                : 0;
+
+            return {
+                stocks: result,
+                totalAnnualDividend: portfolioAnnualDividend,
+                totalPrincipal: portfolioPrincipal,
+                annualDivYield: portfolioAnnualDivYield
+            };
+        });
+
+        const autoCalcShares = () => {
+            if (form.value.principal && form.value.buyNav && form.value.buyNav > 0) {
+                const netCapital = form.value.principal - (form.value.buyFee || 0);
+                form.value.shares = Number((netCapital / form.value.buyNav).toFixed(2));
+            }
+        };
+
+        const autoCalcRedeem = () => {
+            if (form.value.shares && form.value.sellPrice) {
+                const gross = Number((form.value.shares * form.value.sellPrice).toFixed(2));
+                const fee = Number(form.value.sellFee || 0);
+                form.value.sellRedeemAmount = Number((gross - fee).toFixed(2));
+            }
+        };
+
+        // Inline Editing Logic
+        const startInlineEdit = (item) => {
+            editingRowId.value = item.id;
+            inlineForm.value = JSON.parse(JSON.stringify(item));
+            nextTick(() => lucide.createIcons());
+        };
+
+        const cancelInlineEdit = () => {
+            editingRowId.value = null;
+            inlineForm.value = {};
+            nextTick(() => lucide.createIcons());
+        };
+
+        const autoCalcInlineShares = () => {
+            if (inlineForm.value.principal && inlineForm.value.buyNav && inlineForm.value.buyNav > 0) {
+                const netCapital = inlineForm.value.principal - (inlineForm.value.buyFee || 0);
+                inlineForm.value.shares = Number((netCapital / inlineForm.value.buyNav).toFixed(2));
+            }
+        };
+
+        const autoCalcInlineRedeem = () => {
+            if (inlineForm.value.shares && inlineForm.value.sellPrice) {
+                const gross = Number((inlineForm.value.shares * inlineForm.value.sellPrice).toFixed(2));
+                const fee = Number(inlineForm.value.sellFee || 0);
+                inlineForm.value.sellRedeemAmount = Number((gross - fee).toFixed(2));
+            }
+        };
+
+        const saveInlineEdit = () => {
+            if (!inlineForm.value.id) return;
+            const idx = items.value.findIndex(i => i.id === inlineForm.value.id);
+            if (idx !== -1) {
+                const existing = items.value[idx];
+                items.value[idx] = {
+                    ...inlineForm.value,
+                    principal: Number(inlineForm.value.principal || 0),
+                    buyNav: Number(inlineForm.value.buyNav || 0),
+                    buyFee: Number(inlineForm.value.buyFee || 0),
+                    shares: Number(inlineForm.value.shares || 0),
+                    latestPrice: Number(inlineForm.value.latestPrice || inlineForm.value.buyNav || 0),
+                    dividend: inlineForm.value.dividend !== undefined && inlineForm.value.dividend !== null && inlineForm.value.dividend !== ''
+                        ? Number(inlineForm.value.dividend) : null,
+                    // 场外基金：累计实收分红；inline 没改动时保留旧数据（不在 inline 里改）
+                    dividendReceived: (inlineForm.value.dividendReceived !== undefined && inlineForm.value.dividendReceived !== null && inlineForm.value.dividendReceived !== '')
+                        ? Number(inlineForm.value.dividendReceived)
+                        : (existing.dividendReceived || null),
+                    sellPrice: inlineForm.value.sellPrice ? Number(inlineForm.value.sellPrice) : null,
+                    sellFee: Number(inlineForm.value.sellFee || 0),
+                    sellRedeemAmount: inlineForm.value.sellRedeemAmount ? Number(inlineForm.value.sellRedeemAmount) : null,
+                    planAddAmount: Number(inlineForm.value.planAddAmount || 0)
+                };
+            }
+            saveToStorage();
+            updateCharts();
+            cancelInlineEdit();
+        };
+
+        const openModal = (item = null) => {
+            if (item) {
+                editingItem.value = { ...item };
+                form.value = {
+                    ...item,
+                    isSold: item.status === '已卖出'
+                };
+            } else {
+                editingItem.value = {};
+                form.value = {
+                    code: '',
+                    name: '',
+                    type: '场内基金',
+                    buyDate: new Date().toISOString().split('T')[0],
+                    buyNav: null,
+                    principal: null,
+                    buyFee: 0,
+                    shares: null,
+                    latestPrice: null,
+                    dividend: null,
+                    dividendReceived: null,
+                    isSold: false,
+                    sellDate: new Date().toISOString().split('T')[0],
+                    sellPrice: null,
+                    sellFee: 0,
+                    sellRedeemAmount: null,
+                    planAddAmount: 0
+                };
+            }
+            modalOpen.value = true;
+            nextTick(() => lucide.createIcons());
+        };
+
+        const saveItem = () => {
+            const status = form.value.isSold ? '已卖出' : '持有中';
+            const payload = {
+                ...form.value,
+                status,
+                principal: Number(form.value.principal),
+                buyNav: Number(form.value.buyNav),
+                buyFee: Number(form.value.buyFee || 0),
+                shares: Number(form.value.shares),
+                latestPrice: Number(form.value.latestPrice || form.value.buyNav),
+                dividend: form.value.dividend !== undefined && form.value.dividend !== null && form.value.dividend !== ''
+                    ? Number(form.value.dividend) : null,
+                // 场外基金：卖出后累计实收分红
+                dividendReceived: (form.value.type === '场外基金' && form.value.dividendReceived !== undefined && form.value.dividendReceived !== null && form.value.dividendReceived !== '')
+                    ? Number(form.value.dividendReceived) : null,
+                sellPrice: form.value.sellPrice ? Number(form.value.sellPrice) : null,
+                sellFee: Number(form.value.sellFee || 0),
+                sellRedeemAmount: form.value.sellRedeemAmount ? Number(form.value.sellRedeemAmount) : null,
+                planAddAmount: Number(form.value.planAddAmount || 0)
+            };
+
+            if (editingItem.value.id) {
+                const idx = items.value.findIndex(i => i.id === editingItem.value.id);
+                if (idx !== -1) items.value[idx] = { ...payload, id: editingItem.value.id };
+            } else {
+                items.value.unshift({ ...payload, id: Date.now().toString() });
+            }
+
+            saveToStorage();
+            modalOpen.value = false;
+            updateCharts();
+        };
+
+        const quickSellToggle = (item) => {
+            if (item.status === '持有中') {
+                item.status = '已卖出';
+                item.sellDate = new Date().toISOString().split('T')[0];
+                item.sellPrice = item.latestPrice;
+                item.sellFee = Number(item.sellFee || 0);
+                const gross = Number((item.shares * item.latestPrice).toFixed(2));
+                item.sellRedeemAmount = Number((gross - item.sellFee).toFixed(2));
+            } else {
+                item.status = '持有中';
+            }
+            saveToStorage();
+            updateCharts();
+        };
+
+        const openDeleteConfirm = (item) => {
+            itemToDelete.value = item;
+            deleteConfirmModalOpen.value = true;
+            nextTick(() => lucide.createIcons());
+        };
+
+        const closeDeleteConfirm = () => {
+            deleteConfirmModalOpen.value = false;
+            itemToDelete.value = null;
+        };
+
+        const openOffMarketFundModal = () => {
+            // 获取所有场外基金，按代码去重（只保留每一支唯一的基金）
+            const fundMap = new Map();
+            items.value.forEach(item => {
+                if (item.type === '场外基金' && item.code) {
+                    const code = item.code.trim();
+                    if (!fundMap.has(code)) {
+                        fundMap.set(code, {
+                            id: code,
+                            code: item.code,
+                            name: item.name,
+                            latestPrice: item.latestPrice || null,
+                            editPrice: item.latestPrice || null
+                        });
+                    }
+                }
+            });
+            offMarketFundsForEdit.value = Array.from(fundMap.values());
+            offMarketFundModalOpen.value = true;
+        };
+
+        const closeOffMarketFundModal = () => {
+            offMarketFundModalOpen.value = false;
+            offMarketFundsForEdit.value = [];
+        };
+
+        const saveOffMarketFundPrices = () => {
+            let updatedCount = 0;
+            
+            offMarketFundsForEdit.value.forEach(editFund => {
+                if (editFund.editPrice !== null && editFund.editPrice !== undefined) {
+                    const newPrice = Number(editFund.editPrice.toFixed(4));
+                    // 更新所有相同代码的场外基金记录
+                    items.value.forEach(item => {
+                        if (item.type === '场外基金' && item.code && item.code.trim() === editFund.code.trim()) {
+                            if (item.latestPrice !== newPrice) {
+                                item.latestPrice = newPrice;
+                                updatedCount++;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            if (updatedCount > 0) {
+                saveToStorage();
+                updateCharts();
+                alert(`成功更新 ${updatedCount} 条场外基金记录的净值！`);
+            }
+            
+            closeOffMarketFundModal();
+        };
+
+        const confirmDelete = () => {
+            if (itemToDelete.value) {
+                items.value = items.value.filter(i => i.id !== itemToDelete.value.id);
+                saveToStorage();
+                updateCharts();
+            }
+            closeDeleteConfirm();
+        };
+
+        const deleteItem = (id) => {
+            items.value = items.value.filter(i => i.id !== id);
+            saveToStorage();
+            updateCharts();
+        };
+
+        // Real-time Stock & Fund Prices Fetcher
+        const getTencentSymbol = (code) => {
+            if (!code) return '';
+            code = code.trim().toLowerCase();
+            if (code.startsWith('sh') || code.startsWith('sz') || code.startsWith('bj') || code.startsWith('hk') || code.startsWith('us') || code.startsWith('fund_')) {
+                return code;
+            }
+            if (/^\d{5}$/.test(code)) {
+                return 'r_hk' + code;
+            }
+            if (/^\d{6}$/.test(code)) {
+                if (code.startsWith('6') || code.startsWith('9') || code.startsWith('5') || code.startsWith('11') || code.startsWith('51') || code.startsWith('56')) {
+                    return 'sh' + code;
+                } else {
+                    return 'sz' + code;
+                }
+            }
+            return code;
+        };
+
+        const fetchLatestPrices = async () => {
+            isRefreshing.value = true;
+            try {
+                // Filter items that need price update (holding status with valid code)
+                const holdingItems = items.value.filter(item => item.code && item.type !== '场外基金');
+
+
+                if (holdingItems.length === 0) {
+                    saveToStorage();
+                    updateCharts();
+                    return;
+                }
+
+                // Separate fund and stock symbols
+                const fundSymbols = [];
+                const stockSymbols = [];
+                holdingItems.forEach(item => {
+                    let rawCode = (item.code || '').toString().trim();
+
+                    // 如果用户在表单中输入了以 0 开头的场外基金，但被存为数字（导致前导 0 丢失），
+                    // 则在明确标注为场外基金时把 5 位数补齐为 6 位（加前导0），例如 11966 -> 011966。
+                    if (/^\d{5}$/.test(rawCode) && item.type === '场外基金') {
+                        rawCode = rawCode.padStart(6, '0');
+                        console.debug('Padded 5-digit code to 6-digit for off-market fund:', rawCode);
+                    }
+
+                    let symbol = getTencentSymbol(rawCode);
+
+                    // 如果用户明确标注为场外基金，优先按场外基金处理
+                    if (item.type === '场外基金') {
+                        symbol = 'fund_' + rawCode;
+                    }
+
+                    if (symbol && symbol.startsWith('fund_')) {
+                        fundSymbols.push({ symbol, item });
+                    } else if (symbol) {
+                        stockSymbols.push({ symbol, item });
+                    }
+                });
+
+                // Debug log: 显示将要请求的场外基金与股票代码，方便排查未包含的标的
+                console.debug('fetchLatestPrices - fundSymbols:', fundSymbols.map(f => f.symbol));
+                console.debug('fetchLatestPrices - stockSymbols:', stockSymbols.map(s => s.symbol));
+
+                // 额外收集所有可能的 6 位数候选（有些场外基金未标注为场外），优先尝试按场外基金查询
+                const potentialFundCandidates = [];
+                holdingItems.forEach(item => {
+                    const raw = (item.code || '').toString().trim();
+                    if (/^\d{6}$/.test(raw)) {
+                        const fundSym = 'fund_' + raw;
+                        // 若尚未在 fundSymbols 中，且不是已明确股票类型，则作为候选场外基金
+                        if (!fundSymbols.some(f => f.symbol === fundSym) && item.type !== '股票') {
+                            potentialFundCandidates.push({ symbol: fundSym, item });
+                        }
+                    }
+                });
+
+                // 合并已识别的场外基金与候选场外基金，先尝试通过场外基金渠道更新它们的净值
+                // 更新后重新构建股票请求列表（剔除已被当作场外基金处理的项）
+                const stockSymbolStrings = [...new Set(holdingItems.map(item => getTencentSymbol((item.code || '').toString().trim())))]
+                    .filter(sym => sym && !sym.startsWith('fund_'));
+                if (stockSymbolStrings.length === 0) {
+                    saveToStorage();
+                    updateCharts();
+                    return;
+                }
+                const url = `https://qt.gtimg.cn/q=${stockSymbolStrings.join(',')}`;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API请求失败');
+
+                const arrayBuffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('gbk');
+                const text = decoder.decode(arrayBuffer);
+                const lines = text.split(';');
+
+                let updatedCount = 0;
+                const priceMap = {};
+
+                // Parse response and build price map
+                lines.forEach(line => {
+                    if (!line.trim() || !line.includes('~')) return;
+                    const match = line.match(/v_([a-zA-Z0-9_]+)=/);
+                    if (!match) return;
+                    
+                    const symbol = match[1].toLowerCase();
+                    const parts = line.split('~');
+                    if (parts.length < 4) return;
+                    
+                    let price;
+                    let name = parts[1] ? parts[1].trim() : '';
+                    // 字段解析说明（基于腾讯 qt.gtimg.cn 实时接口，从0开始）：
+                    //  [3] 当前价  [32] 涨跌幅%  [39] 市盈率TTM
+                    // [44] 流通市值(亿) [45] 总市值(亿) [46] PB
+                    // [64] ★ TTM股息率(%) —— 用它 × 当前价 ÷100 即可算出每股年度分红(元)
+                    let dividendYieldTTM = NaN;
+                    if (parts.length > 64) {
+                        const dy = parseFloat(parts[64]);
+                        if (!isNaN(dy) && dy >= 0 && dy < 100) dividendYieldTTM = dy;
+                    }
+
+                    // 场外基金的数据格式可能不同，尝试从多个位置获取价格
+                    if (symbol.startsWith('fund_')) {
+                        price = parseFloat(parts[2]) || parseFloat(parts[3]) || parseFloat(parts[4]) || 
+                                parseFloat(parts[5]) || parseFloat(parts[6]) || parseFloat(parts[10]);
+                    } else {
+                        price = parseFloat(parts[3]);
+                    }
+                    
+                    if (!isNaN(price) && price > 0) {
+                        priceMap[symbol] = {
+                            price,
+                            name,
+                            dividendYieldTTM: !isNaN(dividendYieldTTM) ? dividendYieldTTM : null
+                        };
+                    }
+                });
+
+                // Update prices & 每股年度分红（从同一条腾讯接口记录派生，零额外请求）
+                holdingItems.forEach(item => {
+                    const symbol = getTencentSymbol(item.code);
+                    const data = priceMap[symbol];
+                    if (data) {
+                        item.latestPrice = Number(data.price.toFixed(4));
+                        if (data.name && (item.name === '' || item.name.includes('新建') || item.name.includes('未命名'))) {
+                            item.name = data.name;
+                        }
+                        if (item.type === '股票' && data.dividendYieldTTM != null && data.dividendYieldTTM > 0) {
+                            const perShare = data.dividendYieldTTM * data.price / 100;
+                            item.dividend = Number(perShare.toFixed(4));
+                        }
+                        updatedCount++;
+                    }
+                });
+
+                saveToStorage();
+                updateCharts();
+                
+                if (updatedCount > 0) {
+                    console.debug(`成功更新 ${updatedCount} 个标的的最新价格！`);
+                }
+            } catch (error) {
+                console.error('获取价格失败:', error);
+                alert('网络请求失败，请检查网络连接后重试');
+            } finally {
+                isRefreshing.value = false;
+            }
+        };
+
+        const openAiDiagnosis = () => {
+            aiModalOpen.value = true;
+            nextTick(() => lucide.createIcons());
+        };
+
+        const runAiAnalysis = async () => {
+            aiLoading.value = true;
+            aiResult.value = '';
+
+            const promptText = `
+请作为顶级基金经理与资产配置专家，分析我目前的持仓资产组合：
+${JSON.stringify(items.value.map(i => ({
+    代码: i.code, 名称: i.name, 类别: i.type, 本金: i.principal, 浮动获利: getItemProfit(i), 持有天数: getItemDays(i), 年化: getItemCAGR(i)
+})), null, 2)}
+
+请提供：
+1. 整体资产配置风险诊断（股票、场内/场外基金比例）
+2. 收益表现亮点与拖累项分析
+3. 针对个股/基金后续跟踪策略的具体加减仓与止盈止损建议。
+用专业、条理清晰的中文回答。
+`;
+
+            try {
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=AIzaSyDmDkT_a1tA2slUSTuLwm6jxy4UEZmIvFg', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptText }] }],
+                        tools: [{ "google_search": {} }]
+                    })
+                });
+                const data = await response.json();
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    aiResult.value = data.candidates[0].content.parts[0].text;
+                } else {
+                    aiResult.value = '诊断生成失败，请稍后再试。';
+                }
+            } catch (err) {
+                aiResult.value = '调用 AI 智能诊断时出错: ' + err.message;
+            } finally {
+                aiLoading.value = false;
+            }
+        };
+
+        // Enrich item with all derived/computed fields before persistence
+        const enrichItem = (item) => {
+            const days = (() => {
+                if (!item.buyDate) return 1;
+                const start = new Date(item.buyDate);
+                const end = item.status === '已卖出' && item.sellDate ? new Date(item.sellDate) : new Date();
+                return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+            })();
+
+            const shares = Number(item.shares || 0);
+            const principal = Number(item.principal || 0);
+            const latestPrice = Number(item.latestPrice || 0);
+            const buyNav = Number(item.buyNav || 0);
+            const dividend = Number(item.dividend || 0);
+
+            // Return rate
+            let returnRate = 0;
+            if (item.status === '已卖出') {
+                const redeem = Number(item.sellRedeemAmount || 0) || (shares * Number(item.sellPrice || 0));
+                returnRate = principal > 0 ? (redeem - principal) / principal : 0;
+            } else {
+                const currentVal = shares * latestPrice;
+                returnRate = principal > 0 ? (currentVal - principal) / principal : 0;
+            }
+
+            // CAGR
+            let cagr = 0;
+            if (days > 0 && returnRate > -1) {
+                cagr = (Math.pow(1 + returnRate, 365 / days) - 1) * 100;
+                if (isNaN(cagr)) cagr = 0;
+                cagr = Math.min(Math.max(cagr, -99.99), 999.99);
+            }
+
+            // Dividend yield (real-time, based on latest price)
+            const dividendYield = latestPrice > 0 ? (dividend / latestPrice) * 100 : 0;
+
+            // YOC (prefer stored yoc, fallback to dynamic)
+            const yocStored = (item.yoc !== undefined && item.yoc !== null && item.yoc !== '' && !isNaN(Number(item.yoc))) ? Number(item.yoc) : 0;
+            const yoc = yocStored > 0 ? yocStored : (buyNav > 0 ? (dividend / buyNav) * 100 : 0);
+
+            // Annual dividend amount
+            const annualDividend = shares * dividend;
+
+            // Profit
+            let profit = 0;
+            if (item.status === '已卖出') {
+                const redeem = Number(item.sellRedeemAmount || 0) || (shares * Number(item.sellPrice || 0));
+                const divRecv = (item.type === '场外基金' && item.dividendReceived) ? Number(item.dividendReceived) : 0;
+                profit = redeem + divRecv - principal;
+            } else {
+                profit = (shares * latestPrice) - principal;
+            }
+
+            // Post-sell change
+            let postSellChange = 0;
+            if (item.status === '已卖出' && item.sellPrice && latestPrice) {
+                postSellChange = (latestPrice - Number(item.sellPrice)) / Number(item.sellPrice);
+            }
+
+            return {
+                ...item,
+                days,
+                returnRate,
+                cagr,
+                dividendYield,
+                yoc,
+                annualDividend,
+                profit,
+                postSellChange
+            };
+        };
+
+        const saveToStorage = () => {
+            // 保存前：1) 清洗历史废弃字段 dividendYield  2) 注入所有派生计算字段
+            const enriched = items.value.map(item => {
+                const { dividendYield, ...rest } = item;
+                return enrichItem(rest);
+            });
+            // 同步更新内存中的 items，保证整个会话期间数据结构一致
+            items.value = enriched;
+            localStorage.setItem('portfolio_items_v2', JSON.stringify(enriched));
+            localStorage.setItem('gitee_config', JSON.stringify(giteeConfig.value));
+        };
+
+        const loadFromStorage = () => {
+            // Load Gitee config
+            const giteeRaw = localStorage.getItem('gitee_config');
+            if (giteeRaw) {
+                try {
+                    giteeConfig.value = { ...giteeConfig.value, ...JSON.parse(giteeRaw) };
+                } catch (e) {
+                    console.error('Failed to load Gitee config:', e);
+                }
+            }
+            const raw = localStorage.getItem('portfolio_items_v2');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    // 加载时：1) 清洗脏字段 dividendYield  2) 补全所有派生计算字段
+                    const cleaned = parsed.map(item => {
+                        const { dividendYield, ...rest } = item;
+                        return enrichItem(rest);
+                    });
+                    items.value = cleaned;
+                    // 若有脏数据或缺失派生字段，立即持久化一次
+                    const needsRefresh = parsed.some(item =>
+                        'dividendYield' in item ||
+                        item.days == null || item.returnRate == null || item.cagr == null ||
+                        item.yoc == null || item.annualDividend == null || item.profit == null ||
+                        item.dividendYield == null || item.postSellChange == null
+                    );
+                    if (needsRefresh) {
+                        saveToStorage();
+                    }
+                } catch (e) {
+                    items.value = defaultSampleData;
+                }
+            } else {
+                items.value = defaultSampleData;
+            }
+        };
+
+        const exportData = () => {
+            // 导出前先保存（自动注入派生字段）
+            saveToStorage();
+            const blob = new Blob([JSON.stringify(items.value, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `投资看板数据备份_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        };
+
+        // Import Modal Methods
+        const openImportModal = () => {
+            importModalOpen.value = true;
+            nextTick(() => lucide.createIcons());
+        };
+
+        const clearImportText = () => {
+            importJsonText.value = '';
+            importStatus.value = '';
+        };
+
+        const importStatusClass = computed(() => {
+            switch(importStatusType.value) {
+                case 'success': return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                case 'error': return 'bg-rose-50 text-rose-700 border border-rose-100';
+                case 'warning': return 'bg-amber-50 text-amber-700 border border-amber-100';
+                default: return 'bg-slate-50 text-slate-600';
+            }
+        });
+
+        const importStatusIcon = computed(() => {
+            switch(importStatusType.value) {
+                case 'success': return 'fa-solid fa-check-circle text-emerald-500';
+                case 'error': return 'fa-solid fa-exclamation-circle text-rose-500';
+                case 'warning': return 'fa-solid fa-exclamation-triangle text-amber-500';
+                default: return 'fa-solid fa-info-circle text-slate-500';
+            }
+        });
+
+        const setImportStatus = (msg, type = 'info') => {
+            importStatus.value = msg;
+            importStatusType.value = type;
+            setTimeout(() => { importStatus.value = ''; }, 5000);
+        };
+
+        const loadSampleDataToEditor = () => {
+            const sampleData = [
+                {
+                    "id": "sample_1",
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "type": "场内基金",
+                    "buyDate": "2024-01-15",
+                    "buyNav": 3.8500,
+                    "principal": 10000,
+                    "buyFee": 5,
+                    "shares": 2596.10,
+                    "latestPrice": 4.1200,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 5000,
+                    "followUp": "按月定投，突破箱体可分批加仓"
+                },
+                {
+                    "id": "sample_2",
+                    "code": "600519",
+                    "name": "贵州茅台",
+                    "type": "股票",
+                    "buyDate": "2024-01-05",
+                    "buyNav": 1720.0000,
+                    "principal": 172000,
+                    "buyFee": 50,
+                    "shares": 100,
+                    "latestPrice": 1680.0000,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 20000,
+                    "followUp": "核心白马股，逢低分批吸筹"
+                }
+            ];
+            importJsonText.value = JSON.stringify(sampleData, null, 2);
+            setImportStatus('已加载样板数据，请根据需要修改', 'info');
+        };
+
+        const submitImportData = () => {
+            if (!importJsonText.value.trim()) {
+                setImportStatus('请输入 JSON 数据内容', 'warning');
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(importJsonText.value);
+                if (Array.isArray(parsed)) {
+                    // Append to existing data instead of replacing
+                    items.value = [...items.value, ...parsed];
+                    saveToStorage();
+                    updateCharts();
+                    setImportStatus(`成功新增 ${parsed.length} 条记录，当前共 ${items.value.length} 条记录！`, 'success');
+                    setTimeout(() => {
+                        importModalOpen.value = false;
+                        importJsonText.value = '';
+                    }, 1500);
+                } else {
+                    setImportStatus('数据格式不正确，应为数组格式', 'error');
+                }
+            } catch (err) {
+                setImportStatus('JSON 格式解析失败: ' + err.message, 'error');
+            }
+        };
+
+        const downloadSampleData = () => {
+            const sampleData = [
+                {
+                    "id": "sample_1",
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "type": "场内基金",
+                    "buyDate": "2024-01-15",
+                    "buyNav": 3.8500,
+                    "principal": 10000,
+                    "buyFee": 5,
+                    "shares": 2596.10,
+                    "latestPrice": 4.1200,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 5000,
+                    "followUp": "按月定投，突破箱体可分批加仓"
+                },
+                {
+                    "id": "sample_2",
+                    "code": "110011",
+                    "name": "易方达中小盘",
+                    "type": "场外基金",
+                    "buyDate": "2023-11-10",
+                    "buyNav": 2.1500,
+                    "principal": 15000,
+                    "buyFee": 15,
+                    "shares": 6969.76,
+                    "latestPrice": 2.4800,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 0,
+                    "followUp": "消费反弹拉升，长期持有"
+                },
+                {
+                    "id": "sample_3",
+                    "code": "600519",
+                    "name": "贵州茅台",
+                    "type": "股票",
+                    "buyDate": "2024-01-05",
+                    "buyNav": 1720.0000,
+                    "principal": 172000,
+                    "buyFee": 50,
+                    "shares": 100,
+                    "latestPrice": 1680.0000,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 20000,
+                    "followUp": "核心白马股，逢低分批吸筹"
+                },
+                {
+                    "id": "sample_4",
+                    "code": "510880",
+                    "name": "红利ETF",
+                    "type": "场内基金",
+                    "buyDate": "2023-06-01",
+                    "buyNav": 2.5000,
+                    "principal": 25000,
+                    "buyFee": 12.5,
+                    "shares": 9995.00,
+                    "latestPrice": 2.6800,
+                    "status": "持有中",
+                    "sellDate": "",
+                    "sellPrice": null,
+                    "sellRedeemAmount": null,
+                    "planAddAmount": 10000,
+                    "followUp": "高股息策略，长期配置"
+                },
+                {
+                    "id": "sample_5",
+                    "code": "000001",
+                    "name": "平安银行",
+                    "type": "股票",
+                    "buyDate": "2022-06-01",
+                    "buyNav": 18.5000,
+                    "principal": 18500,
+                    "buyFee": 10,
+                    "shares": 1000,
+                    "latestPrice": 11.2000,
+                    "status": "已卖出",
+                    "sellDate": "2023-08-10",
+                    "sellPrice": 12.5000,
+                    "sellRedeemAmount": 12480,
+                    "planAddAmount": 0,
+                    "followUp": "及时止损调仓换股"
+                }
+            ];
+
+            const blob = new Blob([JSON.stringify(sampleData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '投资看板样板数据.json';
+            a.click();
+        };
+
+        // Gitee Sync Computed
+        const giteeStatusClass = computed(() => {
+            switch(giteeStatusType.value) {
+                case 'success': return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                case 'error': return 'bg-rose-50 text-rose-700 border border-rose-100';
+                case 'warning': return 'bg-amber-50 text-amber-700 border border-amber-100';
+                default: return 'bg-slate-50 text-slate-600';
+            }
+        });
+
+        const giteeStatusIcon = computed(() => {
+            switch(giteeStatusType.value) {
+                case 'success': return 'fa-solid fa-check-circle text-emerald-500';
+                case 'error': return 'fa-solid fa-exclamation-circle text-rose-500';
+                case 'warning': return 'fa-solid fa-exclamation-triangle text-amber-500';
+                default: return 'fa-solid fa-info-circle text-slate-500';
+            }
+        });
+
+        // Gitee API Methods
+        const openGiteeSyncModal = () => {
+            giteeModalOpen.value = true;
+            nextTick(() => lucide.createIcons());
+        };
+
+        const setGiteeStatus = (msg, type = 'info') => {
+            giteeStatus.value = msg;
+            giteeStatusType.value = type;
+            setTimeout(() => { giteeStatus.value = ''; }, 5000);
+        };
+
+        const getGiteeFileInfo = async (token, user, repo, path) => {
+            const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}?access_token=${token}`;
+            const res = await fetch(url);
+            if (res.status === 200) return await res.json();
+            return null;
+        };
+
+        const uploadToGitee = async () => {
+            const { token, user, repo } = giteeConfig.value;
+            if (!token || !user || !repo) {
+                setGiteeStatus('请填写完整的Gitee配置信息！', 'warning');
+                return;
+            }
+
+            giteeSyncing.value = true;
+            setGiteeStatus('正在同步备份到Gitee云端...', 'info');
+
+            try {
+                const path = 'portfolio_data.json';
+                // 上传前先保存（自动注入派生字段）
+                saveToStorage();
+                const contentStr = JSON.stringify(items.value, null, 2);
+                const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+
+                const fileInfo = await getGiteeFileInfo(token, user, repo, path);
+                const method = fileInfo && fileInfo.sha ? 'PUT' : 'POST';
+
+                const bodyData = {
+                    access_token: token,
+                    content: base64Content,
+                    message: "Backup portfolio data from Investment Management Dashboard",
+                    sha: fileInfo?.sha
+                };
+
+                const url = `https://gitee.com/api/v5/repos/${user}/${repo}/contents/${path}`;
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+
+                if (response.ok) {
+                    const now = new Date();
+                    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                    setGiteeStatus(`备份成功 (${timeStr})`, 'success');
+                    saveToStorage();
+                } else {
+                    const err = await response.json();
+                    setGiteeStatus('备份失败: ' + (err.message || '请求异常'), 'error');
+                }
+            } catch (error) {
+                console.error('Gitee上传失败:', error);
+                setGiteeStatus('连接Gitee失败，请检查网络和配置', 'error');
+            } finally {
+                giteeSyncing.value = false;
+            }
+        };
+
+        const downloadFromGitee = async () => {
+            const { token, user, repo } = giteeConfig.value;
+            if (!token || !user || !repo) {
+                setGiteeStatus('请填写完整的Gitee配置信息！', 'warning');
+                return;
+            }
+
+            giteeSyncing.value = true;
+            setGiteeStatus('正在从Gitee恢复数据...', 'info');
+
+            try {
+                const fileInfo = await getGiteeFileInfo(token, user, repo, 'portfolio_data.json');
+                if (fileInfo && fileInfo.content) {
+                    const rawBin = atob(fileInfo.content);
+                    const decodedStr = decodeURIComponent(Array.prototype.map.call(rawBin, c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+                    
+                    const cloudData = JSON.parse(decodedStr);
+                    if (Array.isArray(cloudData)) {
+                        items.value = cloudData;
+                        saveToStorage();
+                        updateCharts();
+                        setGiteeStatus('数据恢复成功！', 'success');
+                    } else {
+                        setGiteeStatus('云端数据格式异常', 'error');
+                    }
+                } else {
+                    setGiteeStatus('云端未找到同步文件', 'warning');
+                }
+            } catch (error) {
+                console.error('Gitee下载失败:', error);
+                setGiteeStatus('获取数据失败，请检查配置', 'error');
+            } finally {
+                giteeSyncing.value = false;
+            }
+        };
+
+        const importData = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed)) {
+                        items.value = parsed;
+                        saveToStorage();
+                        updateCharts();
+                    }
+                } catch (err) {
+                    alert('数据格式不合规！');
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // Render & Update Visual Charts
+        const updateCharts = () => {
+            nextTick(() => {
+                // Doughnut Chart (Asset Allocation)
+                const categorySums = { '场内基金': 0, '场外基金': 0, '股票': 0 };
+                items.value.forEach(i => {
+                    if (i.status === '持有中') {
+                        const val = Number(i.shares || 0) * Number(i.latestPrice || 0);
+                        if (categorySums[i.type] !== undefined) categorySums[i.type] += val;
+                    }
+                });
+
+                const ctxAsset = document.getElementById('assetChart');
+                if (ctxAsset) {
+                    if (assetChartInstance) assetChartInstance.destroy();
+                    assetChartInstance = new Chart(ctxAsset, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(categorySums),
+                            datasets: [{
+                                data: Object.values(categorySums),
+                                backgroundColor: ['#3b82f6', '#f59e0b', '#a855f7'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                            },
+                            cutout: '70%'
+                        }
+                    });
+                }
+
+                // Bar Chart (Top Profit/Loss Assets)
+                const sorted = [...items.value]
+                    .map(i => ({ name: i.name, profit: getItemProfit(i) }))
+                    .sort((a, b) => b.profit - a.profit)
+                    .slice(0, 8);
+
+                const ctxProfit = document.getElementById('profitChart');
+                if (ctxProfit) {
+                    if (profitChartInstance) profitChartInstance.destroy();
+                    profitChartInstance = new Chart(ctxProfit, {
+                        type: 'bar',
+                        data: {
+                            labels: sorted.map(s => s.name),
+                            datasets: [{
+                                label: '获利金额 (元)',
+                                data: sorted.map(s => s.profit),
+                                backgroundColor: sorted.map(s => s.profit >= 0 ? '#f43f5e' : '#10b981'),
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
+                                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                            }
+                        }
+                    });
+                }
+            });
+        };
+
+        // Format Utilities
+        const formatMoney = (val) => {
+            if (val === null || val === undefined || isNaN(val)) return '0.00';
+            return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const formatNumber = (val, decimals = 2) => {
+            if (val === null || val === undefined || isNaN(val)) return '0.00';
+            return Number(val).toFixed(decimals);
+        };
+
+        onMounted(() => {
+            loadFromStorage();
+            updateCharts();
+            lucide.createIcons();
+        });
+
+        return {
+            items,
+            filterType,
+            filterStatus,
+            searchQuery,
+            filteredItems,
+            summary,
+            editingRowId,
+            inlineForm,
+            modalOpen,
+            editingItem,
+            form,
+            isRefreshing,
+            aiModalOpen,
+            aiLoading,
+            aiResult,
+            getItemDays,
+            getItemReturnRate,
+            getItemCAGR,
+            getItemProfit,
+            getDividendYield,
+            getDividendYieldOnCost,
+            getItemAnnualDividend,
+            stockDividendSummary,
+            autoCalcShares,
+            autoCalcRedeem,
+            startInlineEdit,
+            cancelInlineEdit,
+            autoCalcInlineShares,
+            autoCalcInlineRedeem,
+            saveInlineEdit,
+            openModal,
+            saveItem,
+            quickSellToggle,
+            deleteItem,
+            // Delete Confirm
+            deleteConfirmModalOpen,
+            itemToDelete,
+            openDeleteConfirm,
+            closeDeleteConfirm,
+            confirmDelete,
+            // Dividend Summary Modal
+            dividendModalOpen,
+            openDividendModal,
+            closeDividendModal,
+            // Off-Market Fund Modal
+            offMarketFundModalOpen,
+            offMarketFundsForEdit,
+            openOffMarketFundModal,
+            closeOffMarketFundModal,
+            saveOffMarketFundPrices,
+            fetchLatestPrices,
+            openAiDiagnosis,
+            runAiAnalysis,
+            exportData,
+            importData,
+            downloadSampleData,
+            // Import Modal
+            importModalOpen,
+            importJsonText,
+            importStatus,
+            importStatusClass,
+            importStatusIcon,
+            openImportModal,
+            clearImportText,
+            loadSampleDataToEditor,
+            submitImportData,
+            formatMoney,
+            formatNumber,
+            // Gitee Sync
+            giteeModalOpen,
+            giteeSyncing,
+            giteeStatus,
+            giteeStatusClass,
+            giteeStatusIcon,
+            giteeConfig,
+            openGiteeSyncModal,
+            uploadToGitee,
+            downloadFromGitee
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>

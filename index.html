@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#030712">
+    <title>财务中枢 · 个人理财管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #030712;
+            color: #e2e8f0;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        .sidebar {
+            background: linear-gradient(180deg, #0f172a 0%, #030712 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar.collapsed { width: 68px; }
+        .sidebar.collapsed .nav-label,
+        .sidebar.collapsed .section-label,
+        .sidebar.collapsed .logo-text,
+        .sidebar.collapsed .nav-desc { display: none; }
+        .sidebar.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+        .sidebar.collapsed .nav-icon-wrap { margin: 0; }
+        .sidebar.collapsed .brand-area { justify-content: center; padding-left: 0; padding-right: 0; }
+        .sidebar.collapsed .sidebar-footer { justify-content: center; }
+        .sidebar.collapsed .sidebar-footer .user-info { display: none; }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            margin: 2px 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            color: #94a3b8;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #e2e8f0;
+        }
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(16, 185, 129, 0.15));
+            color: #fff;
+            border: 1px solid rgba(99, 102, 241, 0.25);
+        }
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: linear-gradient(180deg, #6366f1, #10b981);
+            border-radius: 2px;
+        }
+        .nav-icon-wrap {
+            width: 38px;
+            height: 38px;
+            flex-shrink: 0;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            margin-right: 12px;
+            transition: transform 0.25s ease;
+        }
+        .nav-item:hover .nav-icon-wrap { transform: scale(1.08); }
+
+        .nav-item[data-color="indigo"] .nav-icon-wrap { background: linear-gradient(135deg, #6366f1, #4338ca); color: #fff; }
+        .nav-item[data-color="emerald"] .nav-icon-wrap { background: linear-gradient(135deg, #10b981, #047857); color: #fff; }
+        .nav-item[data-color="amber"] .nav-icon-wrap { background: linear-gradient(135deg, #f59e0b, #b45309); color: #fff; }
+        .nav-item[data-color="rose"] .nav-icon-wrap { background: linear-gradient(135deg, #f43f5e, #9f1239); color: #fff; }
+
+        .nav-item.active[data-color="indigo"] { box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
+        .nav-item.active[data-color="emerald"] { box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.3); }
+        .nav-item.active[data-color="amber"] { box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.3); }
+        .nav-item.active[data-color="rose"] { box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.3); }
+
+        .nav-label {
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .nav-text-wrap { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: #475569;
+            padding: 16px 20px 6px;
+        }
+
+        .brand-area {
+            display: flex;
+            align-items: center;
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            gap: 12px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6366f1 0%, #10b981 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 8px 20px -6px rgba(99, 102, 241, 0.5);
+        }
+        .logo-text {
+            font-size: 17px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #818cf8, #34d399);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .logo-text span { font-size: 11px; font-weight: 500; -webkit-text-fill-color: #64748b; display: block; margin-top: 2px; }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-footer .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #334155, #1e293b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .sidebar-footer .user-info { flex: 1; min-width: 0; }
+        .sidebar-footer .user-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .sidebar-footer .user-status { font-size: 11px; color: #10b981; display: flex; align-items: center; gap: 5px; }
+        .sidebar-footer .user-status::before {
+            content: '';
+            width: 6px; height: 6px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        .top-bar {
+            height: 56px;
+            flex-shrink: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 12px;
+        }
+
+        .collapse-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .collapse-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #64748b;
+            min-width: 0;
+        }
+        .breadcrumb .current {
+            color: #e2e8f0;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .breadcrumb .sep { color: #334155; font-size: 10px; }
+
+        .top-bar-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+        }
+        .action-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+
+        .theme-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .iframe-container {
+            flex: 1;
+            position: relative;
+            background: #0f172a;
+        }
+        .iframe-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 30;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .mobile-overlay.show { display: block; opacity: 1; }
+
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+
+        .loading-indicator {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            z-index: 5;
+            transition: opacity 0.3s;
+        }
+        .loading-indicator.hidden { opacity: 0; pointer-events: none; }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Desktop only: visible on desktop */
+        @media (min-width: 769px) {
+            .mobile-only { display: none !important; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 40;
+                transform: translateX(-100%);
+                width: 260px !important;
+            }
+            .sidebar.mobile-open { transform: translateX(0); }
+            /* On mobile, collapsed state should still show full */
+            .sidebar.collapsed { width: 260px !important; }
+            .sidebar.collapsed .nav-label,
+            .sidebar.collapsed .section-label,
+            .sidebar.collapsed .logo-text,
+            .sidebar.collapsed .nav-desc { display: block; }
+            .sidebar.collapsed .nav-item { justify-content: flex-start; padding-left: 14px; }
+            .sidebar.collapsed .nav-icon-wrap { margin-right: 12px; }
+            .sidebar.collapsed .brand-area { justify-content: flex-start; padding-left: 16px; }
+            .sidebar.collapsed .sidebar-footer { justify-content: flex-start; }
+            .sidebar.collapsed .sidebar-footer .user-info { display: flex; }
+
+            .top-bar { padding: 0 12px; }
+            .breadcrumb .parent { display: none; }
+            .breadcrumb .sep.parent-sep { display: none; }
+            .desktop-only { display: none !important; }
+            .mobile-only { display: flex !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="flex h-screen w-screen overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-[240px] flex-shrink-0">
+            <!-- Brand -->
+            <div class="brand-area">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-layer-group text-lg text-white"></i>
+                </div>
+                <div class="logo-text">
+                    财务中枢
+                    <span>Personal Finance Hub</span>
+                </div>
+            </div>
+
+            <!-- Nav -->
+            <nav class="sidebar-nav py-2">
+                <div class="section-label">功能模块</div>
+
+                <div class="nav-item active" data-page="investment" data-url="investmentManagement.html" data-title="智投精算看板" data-parent="投资管理" data-color="indigo">
+                    <div class="nav-icon-wrap"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="nav-text-wrap">
+                        <span class="nav-label">智投精算看板</span>
+                    </div>
+                </div>
+
+                <div class="nav-item" data-page="dividend" data-url="dividend.html" data-title="股息自由之路" data-parent="被动收入" data-color="emerald">
+                    <div class="nav-icon-wrap"><i class="fa-solid fa-coins"></i></div>
+                    <div class="nav-text-wrap">
+                        <span class="nav-label">股息自由之路</span>
+                    </div>
+                </div>
+
+                <div class="nav-item" data-page="finance" data-url="personalFinancesDashboard.html" data-title="个人资金统计" data-parent="净资产管理" data-color="amber">
+                    <div class="nav-icon-wrap"><i class="fa-solid fa-wallet"></i></div>
+                    <div class="nav-text-wrap">
+                        <span class="nav-label">个人资金统计</span>
+                    </div>
+                </div>
+
+                <div class="nav-item" data-page="ledger" data-url="ledgerWorkbench.html" data-title="日常记账工作台" data-parent="日常记账" data-color="rose">
+                    <div class="nav-icon-wrap"><i class="fa-solid fa-book-open"></i></div>
+                    <div class="nav-text-wrap">
+                        <span class="nav-label">日常记账工作台</span>
+                    </div>
+                </div>
+
+                <div class="nav-item" onclick="loadHome()">
+                    <div class="nav-icon-wrap" style="background: linear-gradient(135deg, #64748b, #334155); color: #fff;"><i class="fa-solid fa-house"></i></div>
+                    <div class="nav-text-wrap">
+                        <span class="nav-label">首页概览</span>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Footer -->
+            <div class="sidebar-footer">
+                <div class="avatar"><i class="fa-solid fa-user-astronaut"></i></div>
+                <div class="user-info">
+                    <div class="user-name">财务管理员</div>
+                    <div class="user-status">系统运行中</div>
+                </div>
+                <div class="action-btn" title="设置">
+                    <i class="fa-solid fa-gear"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="content-area">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="collapse-btn desktop-only" onclick="toggleSidebar()" title="折叠/展开侧边栏">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </div>
+                <div class="collapse-btn mobile-only" onclick="toggleMobileSidebar()" style="display:none;">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </div>
+
+                <div class="breadcrumb">
+                    <span class="parent" id="breadcrumb-parent">投资管理</span>
+                    <i class="fa-solid fa-chevron-right sep parent-sep"></i>
+                    <span class="current" id="breadcrumb-current">智投精算看板</span>
+                </div>
+
+                <div class="top-bar-actions">
+                    <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                        <div class="theme-dot"></div>
+                        <span class="text-xs text-slate-300">在线</span>
+                    </div>
+                    <div class="action-btn" title="刷新页面" onclick="refreshFrame()">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </div>
+                    <a class="action-btn" title="在新标签页打开" id="openNewTab" href="investmentManagement.html" target="_blank">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+            </header>
+
+            <!-- Iframe Container -->
+            <div class="iframe-container">
+                <div class="loading-indicator" id="loading">
+                    <div class="spinner"></div>
+                </div>
+                <iframe id="content-frame" src="investmentManagement.html"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
+
+    <!-- Home View (shown when "首页概览" is clicked) -->
+    <template id="home-template">
+        <div style="padding: 40px; max-width: 900px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 9999px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); color: #a5b4fc; font-size: 12px; font-weight: 500; margin-bottom: 16px;">
+                    <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981;"></span>
+                    欢迎回来
+                </div>
+                <h1 style="font-size: 36px; font-weight: 800; background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px;">财务中枢</h1>
+                <p style="color: #94a3b8; font-size: 16px; margin: 0;">一站式个人理财管理系统</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 30px;">
+                <div onclick="navigateTo('investment')" style="padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(67,56,202,0.1)); border: 1px solid rgba(99,102,241,0.2); cursor: pointer; transition: all 0.25s;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#4338ca);display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-chart-line" style="color:#fff;font-size:18px;"></i></div>
+                    <div style="font-size:16px;font-weight:700;color:#fff;">智投精算看板</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">基金 · 股票 · AI诊断</div>
+                </div>
+                <div onclick="navigateTo('dividend')" style="padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(4,120,87,0.1)); border: 1px solid rgba(16,185,129,0.2); cursor: pointer; transition: all 0.25s;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#10b981,#047857);display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-coins" style="color:#fff;font-size:18px;"></i></div>
+                    <div style="font-size:16px;font-weight:700;color:#fff;">股息自由之路</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">被动收入 · 复利模拟</div>
+                </div>
+                <div onclick="navigateTo('finance')" style="padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(180,83,9,0.1)); border: 1px solid rgba(245,158,11,0.2); cursor: pointer; transition: all 0.25s;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#b45309);display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-wallet" style="color:#fff;font-size:18px;"></i></div>
+                    <div style="font-size:16px;font-weight:700;color:#fff;">个人资金统计</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">净资产 · 周期对比</div>
+                </div>
+                <div onclick="navigateTo('ledger')" style="padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(244,63,94,0.15), rgba(159,18,57,0.1)); border: 1px solid rgba(244,63,94,0.2); cursor: pointer; transition: all 0.25s;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#f43f5e,#9f1239);display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-book-open" style="color:#fff;font-size:18px;"></i></div>
+                    <div style="font-size:16px;font-weight:700;color:#fff;">日常记账工作台</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">收支 · OCR · 分析</div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let sidebarCollapsed = false;
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebarCollapsed = !sidebarCollapsed;
+            sidebar.classList.toggle('collapsed', sidebarCollapsed);
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('show');
+        }
+
+        function refreshFrame() {
+            const frame = document.getElementById('content-frame');
+            const loading = document.getElementById('loading');
+            loading.classList.remove('hidden');
+            frame.src = frame.src;
+        }
+
+        function loadHome() {
+            const frame = document.getElementById('content-frame');
+            const loading = document.getElementById('loading');
+            const newTab = document.getElementById('openNewTab');
+            const breadcrumbParent = document.getElementById('breadcrumb-parent');
+            const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+
+            loading.classList.remove('hidden');
+
+            // Build home view
+            const template = document.getElementById('home-template');
+            const homeHtml = template.innerHTML;
+
+            // Create a blob URL for the home view
+            const homePage = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${homeTemplateStyles()}</style></head><body>${homeHtml}<script>${homeScript()}<\/script></body></html>`;
+            const blob = new Blob([homePage], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+
+            frame.src = url;
+            newTab.href = url;
+            breadcrumbParent.textContent = '首页';
+            breadcrumbCurrent.textContent = '概览';
+            document.title = '首页概览 · 财务中枢';
+
+            // Update active state
+            document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
+
+            frame.addEventListener('load', () => {
+                loading.classList.add('hidden');
+            }, { once: true });
+
+            if (window.innerWidth <= 768) {
+                toggleMobileSidebar();
+            }
+        }
+
+        function homeTemplateStyles() {
+            return `
+                * { -webkit-tap-highlight-color: transparent; }
+                body {
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                    background: radial-gradient(circle at 20% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                                radial-gradient(circle at 80% 100%, rgba(16, 185, 129, 0.12) 0%, transparent 50%),
+                                #030712;
+                    color: #e2e8f0;
+                    min-height: 100vh;
+                    margin: 0;
+                    padding: 0;
+                }
+                div[onclick] { transition: transform 0.25s, box-shadow 0.25s; }
+                div[onclick]:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5); }
+                @media (max-width: 640px) {
+                    body { padding: 20px; }
+                    h1 { font-size: 28px !important; }
+                }
+            `;
+        }
+
+        function homeScript() {
+            return `
+                function navigateTo(page) {
+                    const pages = {
+                        investment: 'investmentManagement.html',
+                        dividend: 'dividend.html',
+                        finance: 'personalFinancesDashboard.html',
+                        ledger: 'ledgerWorkbench.html'
+                    };
+                    window.parent.postMessage({ type: 'navigate', page: page }, '*');
+                }
+            `;
+        }
+
+        // Listen for messages from home iframe
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'navigate') {
+                const target = document.querySelector('.nav-item[data-page="' + e.data.page + '"]');
+                if (target) target.click();
+            }
+        });
+
+        // Navigation click handling
+        document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+            item.addEventListener('click', () => {
+                const url = item.dataset.url;
+                const title = item.dataset.title;
+                const parent = item.dataset.parent;
+
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                item.classList.add('active');
+
+                document.getElementById('breadcrumb-parent').textContent = parent;
+                document.getElementById('breadcrumb-current').textContent = title;
+
+                const frame = document.getElementById('content-frame');
+                const loading = document.getElementById('loading');
+                const newTab = document.getElementById('openNewTab');
+                loading.classList.remove('hidden');
+                frame.src = url;
+                newTab.href = url;
+                document.title = title + ' · 财务中枢';
+
+                if (window.innerWidth <= 768) {
+                    toggleMobileSidebar();
+                }
+
+                frame.addEventListener('load', () => {
+                    loading.classList.add('hidden');
+                }, { once: true });
+            });
+        });
+
+        document.getElementById('content-frame').addEventListener('load', () => {
+            document.getElementById('loading').classList.add('hidden');
+        });
+    </script>
+
+</body>
+</html>

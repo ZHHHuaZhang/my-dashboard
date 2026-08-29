@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#8b5cf6">
+<title>物品管理系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { overscroll-behavior: none; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: #f8fafc; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .category-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .toast { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; transform: translateX(400px); transition: transform 0.3s; max-width: calc(100vw - 40px); }
+  .toast.show { transform: translateX(0); }
+  .toast.success { background: #10b981; }
+  .toast.error { background: #ef4444; }
+  .toast.info { background: #3b82f6; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 9998; }
+  .modal-overlay.show { display: flex; }
+  .card-hover { transition: all 0.2s; }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .stat-card { transition: all 0.3s; }
+  .stat-card:hover { transform: scale(1.02); }
+  .tab-active { border-bottom: 2px solid #8b5cf6; color: #8b5cf6 !important; font-weight: 600; }
+  .mobile-nav {
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    z-index: 25;
+  }
+  .fab {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.5), 0 8px 10px -6px rgba(139, 92, 246, 0.3);
+    z-index: 40;
+    transition: transform 0.2s ease;
+  }
+  .fab:active { transform: scale(0.92); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  @media (max-width: 768px) {
+    .stat-card { padding: 16px !important; }
+    .stat-card .text-2xl { font-size: 1.5rem; }
+    table { font-size: 13px; }
+    .card-hover { padding: 16px !important; }
+    .filter-bar { flex-direction: column; align-items: stretch; }
+    .filter-bar > div { width: 100%; }
+    .filter-bar select { width: 100%; }
+    .filter-bar .flex-1.min-w-\[200px\] { width: 100%; }
+  }
+  @media (max-width: 480px) {
+    .stat-card .w-12.h-12 { width: 44px; height: 44px; }
+    .text-2xl.font-bold { font-size: 1.5rem; }
+    .text-xl.font-bold { font-size: 1.25rem; }
+    .modal-overlay .bg-white { margin: 8px; padding: 20px; }
+    canvas { max-height: 220px; }
+  }
+</style>
+</head>
+<body class="bg-slate-50">
+
+<!-- Sticky Header with Top Tabs -->
+<div class="sticky top-0 z-30 bg-white shadow-sm border-b border-slate-200 safe-top">
+  <div class="px-4 md:px-6 lg:px-8 max-w-[1700px] mx-auto">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 py-4">
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 md:p-3 rounded-xl shadow-md" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+          <i class="fas fa-box text-white text-lg md:text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">物品管理系统</h1>
+          <p class="hidden sm:block text-xs text-slate-500">记录管理你的物品资产，分类统计一目了然</p>
+        </div>
+      </div>
+
+      <!-- Desktop Tabs -->
+      <nav class="hidden md:flex space-x-6 text-sm font-medium">
+        <button onclick="switchView('overview')" id="tab-btn-overview" class="py-5 px-1 tab-active transition-colors flex items-center space-x-2">
+          <i class="fas fa-chart-pie"></i><span>概览</span>
+        </button>
+        <button onclick="switchView('items')" id="tab-btn-items" class="py-5 px-1 text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+          <i class="fas fa-list"></i><span>物品列表</span>
+        </button>
+        <button onclick="switchView('stats')" id="tab-btn-stats" class="py-5 px-1 text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+          <i class="fas fa-chart-bar"></i><span>统计分析</span>
+        </button>
+      </nav>
+
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <button id="btnExport" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-xs sm:text-sm font-medium transition border border-slate-200" title="导出数据">
+          <i class="fas fa-download"></i><span class="hidden sm:inline">导出</span>
+        </button>
+        <button id="btnImport" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-xs sm:text-sm font-medium transition border border-slate-200" title="导入数据">
+          <i class="fas fa-upload"></i><span class="hidden sm:inline">导入</span>
+        </button>
+        <input type="file" id="importFile" accept=".json" class="hidden">
+        <button id="btnSample" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs sm:text-sm font-medium transition border border-purple-200/60" title="加载示例数据">
+          <i class="fas fa-magic"></i><span class="hidden sm:inline">示例</span>
+        </button>
+        <button id="btnAddItem" class="flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg md:rounded-xl text-xs sm:text-sm font-semibold shadow-md shadow-purple-100 transition">
+          <i class="fas fa-plus"></i>
+          <span class="hidden md:inline">添加物品</span>
+          <span class="md:hidden">添加</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Top Tabs -->
+  <nav class="mobile-nav md:hidden flex justify-around items-center border-t border-slate-200 bg-white">
+    <button onclick="switchView('overview')" id="m-tab-overview" class="flex-1 py-2.5 flex flex-col items-center text-[11px] text-purple-600 font-semibold">
+      <i class="fas fa-chart-pie text-base mb-0.5"></i><span>概览</span>
+    </button>
+    <button onclick="switchView('items')" id="m-tab-items" class="flex-1 py-2.5 flex flex-col items-center text-[11px] text-slate-500">
+      <i class="fas fa-list text-base mb-0.5"></i><span>物品</span>
+    </button>
+    <button onclick="switchView('stats')" id="m-tab-stats" class="flex-1 py-2.5 flex flex-col items-center text-[11px] text-slate-500">
+      <i class="fas fa-chart-bar text-base mb-0.5"></i><span>统计</span>
+    </button>
+  </nav>
+</div>
+
+<div id="app" class="p-4 md:p-6 lg:p-8 max-w-[1700px] mx-auto space-y-5">
+
+  <!-- Mobile FAB -->
+  <button onclick="openModal()" class="fab md:hidden" aria-label="添加物品">
+    <i class="fas fa-plus text-2xl"></i>
+  </button>
+
+  <!-- Overview View -->
+  <div class="view active" id="view-overview">
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm">物品总数</p>
+            <p class="text-2xl font-bold text-slate-800" id="statTotal">0</p>
+          </div>
+          <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-box text-blue-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm">总花费</p>
+            <p class="text-2xl font-bold text-slate-800" id="statTotalValue">¥0</p>
+          </div>
+          <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-yen-sign text-green-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm">分类数</p>
+            <p class="text-2xl font-bold text-slate-800" id="statCategories">0</p>
+          </div>
+          <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-tags text-purple-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm">本月新增</p>
+            <p class="text-2xl font-bold text-slate-800" id="statThisMonth">0</p>
+          </div>
+          <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-calendar text-orange-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm">保质期预警</p>
+            <p class="text-2xl font-bold" id="statExpiring" style="color:#d97706;">0</p>
+          </div>
+          <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:#fef3c7;">
+            <i class="fas fa-triangle-exclamation text-xl" style="color:#d97706;"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-chart-pie text-purple-600"></i>分类占比
+        </h3>
+        <div style="position: relative; height: 280px;">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-chart-bar text-green-600"></i>分类花费
+        </h3>
+        <div style="position: relative; height: 280px;">
+          <canvas id="categoryValueChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Items -->
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-clock text-orange-600"></i>最近添加
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="text-left text-slate-500 text-sm border-b border-slate-200">
+              <th class="pb-3">名称</th>
+              <th class="pb-3">分类</th>
+              <th class="pb-3">价格</th>
+              <th class="pb-3">购买日期</th>
+              <th class="pb-3">保质期</th>
+            </tr>
+          </thead>
+          <tbody id="recentItems"></tbody>
+        </table>
+        <div id="emptyRecent" class="text-center py-8 text-slate-400 hidden">
+          <i class="fas fa-inbox text-4xl mb-2"></i>
+          <p>暂无物品记录</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Items View -->
+  <div class="view" id="view-items">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+      <h2 class="text-2xl font-bold text-slate-800">物品列表</h2>
+      <div class="flex gap-2">
+        <button id="btnAddItem2" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow">
+          <i class="fas fa-plus"></i>添加物品
+        </button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mb-4">
+      <div class="flex flex-wrap gap-3 items-center filter-bar">
+        <div class="flex-1 min-w-[200px]">
+          <div class="relative">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="searchInput" placeholder="搜索物品名称或备注..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+          </div>
+        </div>
+        <select id="filterCategory" class="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <option value="">全部分类</option>
+        </select>
+        <select id="sortBy" class="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <option value="date_desc">最新购买</option>
+          <option value="date_asc">最早购买</option>
+          <option value="price_desc">价格从高到低</option>
+          <option value="price_asc">价格从低到高</option>
+          <option value="name_asc">名称排序</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Items Grid -->
+    <div id="itemsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="emptyItems" class="text-center py-16 text-slate-400 hidden">
+      <i class="fas fa-box-open text-5xl mb-3"></i>
+      <p class="text-lg">暂无物品记录</p>
+      <p class="text-sm">点击"添加物品"开始记录你的物品</p>
+    </div>
+  </div>
+
+  <!-- Stats View -->
+  <div class="view" id="view-stats">
+    <h2 class="text-2xl font-bold text-slate-800 mb-6">统计分析</h2>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4">分类详情</h3>
+        <div id="categoryDetail" class="space-y-3"></div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4">月度花费趋势</h3>
+        <div style="position: relative; height: 300px;">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4">价格区间分布</h3>
+        <div style="position: relative; height: 280px;">
+          <canvas id="priceRangeChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <h3 class="font-semibold text-slate-800 mb-4">最贵物品 TOP 5</h3>
+        <div id="topItems" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- Expiry Warnings -->
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-triangle-exclamation text-amber-500"></i>保质期提醒
+      </h3>
+      <div id="expiryWarnings" class="space-y-2"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal-overlay" id="itemModal">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-5">
+      <h3 class="text-xl font-bold text-slate-800" id="modalTitle">添加物品</h3>
+      <button id="closeModal" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+    </div>
+    <form id="itemForm" class="space-y-4">
+      <input type="hidden" id="itemId">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">物品名称 *</label>
+        <input type="text" id="itemName" required class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">分类 *</label>
+          <select id="itemCategory" required class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="">请选择</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">价格 (¥) *</label>
+          <input type="number" id="itemPrice" step="0.01" min="0" required class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">购买日期 *</label>
+          <input type="date" id="itemDate" required class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">品牌/商家</label>
+          <input type="text" id="itemBrand" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+        </div>
+      </div>
+      <div id="expiryFieldWrap" class="hidden">
+        <label class="block text-sm font-medium text-slate-700 mb-1">保质期 (到期日期) <span class="text-red-500">*</span></label>
+        <input type="date" id="itemExpiry" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+        <p class="text-xs text-slate-400 mt-1">食品和药品建议填写保质期，系统会自动提醒即将到期或已过期的物品</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">备注</label>
+        <textarea id="itemNotes" rows="3" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" id="cancelBtn" class="flex-1 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50">取消</button>
+        <button type="submit" class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'item_management_data_v1';
+
+const CATEGORIES = {
+  clothing: { name: '衣物', color: '#ec4899', icon: 'fa-shirt' },
+  food: { name: '食品', color: '#f59e0b', icon: 'fa-utensils', needsExpiry: true },
+  medicine: { name: '药品', color: '#14b8a6', icon: 'fa-pills', needsExpiry: true },
+  shoes: { name: '鞋子', color: '#06b6d4', icon: 'fa-shoe-prints' },
+  electronics: { name: '电子产品', color: '#3b82f6', icon: 'fa-laptop' },
+  software: { name: '虚拟软件会员', color: '#8b5cf6', icon: 'fa-user-gear' },
+  general: { name: '其他物品', color: '#10b981', icon: 'fa-box' }
+};
+
+let items = [];
+let charts = {};
+
+function loadData() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    items = data ? JSON.parse(data) : [];
+  } catch(e) { items = []; }
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function uuid() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function showToast(msg, type) {
+  type = type || 'info';
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast show ' + type;
+  setTimeout(function() { toast.classList.remove('show'); }, 2500);
+}
+
+function renderCategoryOptions() {
+  const sel = document.getElementById('itemCategory');
+  const filterSel = document.getElementById('filterCategory');
+  sel.innerHTML = '<option value="">请选择</option>';
+  filterSel.innerHTML = '<option value="">全部分类</option>';
+  for (const [key, cat] of Object.entries(CATEGORIES)) {
+    sel.innerHTML += '<option value="' + key + '">' + cat.name + '</option>';
+    filterSel.innerHTML += '<option value="' + key + '">' + cat.name + '</option>';
+  }
+}
+
+function getExpiryStatus(expiry) {
+  if (!expiry) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const exp = new Date(expiry);
+  exp.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { status: 'expired', days: diffDays };
+  if (diffDays <= 30) return { status: 'soon', days: diffDays };
+  return { status: 'normal', days: diffDays };
+}
+
+function expiryBadge(expiry) {
+  if (!expiry) return '';
+  const info = getExpiryStatus(expiry);
+  if (!info) return '';
+  const labels = { expired: '已过期', soon: '即将过期', normal: '保质期内' };
+  const days = info.days;
+  let dayText = '';
+  if (info.status === 'expired') {
+    dayText = '过期 ' + Math.abs(days) + ' 天';
+  } else if (info.status === 'soon') {
+    dayText = days + ' 天后到期';
+  } else {
+    const months = Math.floor(days / 30);
+    const remainDays = days % 30;
+    if (months > 0) {
+      dayText = months + '个月' + (remainDays > 0 ? remainDays + '天' : '');
+    } else {
+      dayText = days + ' 天';
+    }
+  }
+  const colors = {
+    expired: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
+    soon: { bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
+    normal: { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0' }
+  };
+  const c = colors[info.status];
+  const icon = info.status === 'expired' ? 'fa-times-circle' : (info.status === 'soon' ? 'fa-exclamation-triangle' : 'fa-check-circle');
+  return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:' + c.bg + ';color:' + c.text + ';border:1px solid ' + c.border + ';margin-top:4px;">' +
+    '<i class="fas ' + icon + '"></i>' + dayText + '</span>';
+}
+
+function categoryBadge(key) {
+  const c = CATEGORIES[key];
+  return '<span class="category-badge" style="background:' + c.color + '15; color:' + c.color + ';">' +
+    '<i class="fas ' + c.icon + '"></i>' + c.name + '</span>';
+}
+
+function fmtMoney(v) { return '¥' + Number(v).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function animateNumber(id, target) {
+  const el = document.getElementById(id);
+  const start = parseInt(el.textContent) || 0;
+  const duration = 600;
+  const startTime = performance.now();
+  function step(now) {
+    const p = Math.min((now - startTime) / duration, 1);
+    el.textContent = Math.floor(start + (target - start) * p);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderOverview() {
+  const total = items.length;
+  const totalValue = items.reduce(function(s, i) { return s + Number(i.price || 0); }, 0);
+  const cats = {};
+  items.forEach(function(i) { cats[i.category] = true; });
+  const catCount = Object.keys(cats).length;
+
+  const now = new Date();
+  const thisMonth = items.filter(function(i) {
+    const d = new Date(i.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  animateNumber('statTotal', total);
+  document.getElementById('statTotalValue').textContent = fmtMoney(totalValue);
+  document.getElementById('statCategories').textContent = catCount;
+  animateNumber('statThisMonth', thisMonth);
+
+  const expiringCount = items.filter(function(i) {
+    const cat = CATEGORIES[i.category];
+    if (!cat || !cat.needsExpiry || !i.expiry) return false;
+    const info = getExpiryStatus(i.expiry);
+    return info && (info.status === 'expired' || info.status === 'soon');
+  }).length;
+  animateNumber('statExpiring', expiringCount);
+
+  const sorted = items.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); }).slice(0, 5);
+  const tbody = document.getElementById('recentItems');
+  const empty = document.getElementById('emptyRecent');
+  if (sorted.length === 0) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+  } else {
+    empty.classList.add('hidden');
+    tbody.innerHTML = sorted.map(function(i) {
+      const c = CATEGORIES[i.category];
+      const expiryCell = (c && c.needsExpiry) ? (i.expiry ? i.expiry : '<span class="text-slate-300">-</span>') : '<span class="text-slate-300">-</span>';
+      return '<tr class="border-b border-slate-100 hover:bg-slate-50">' +
+        '<td class="py-3 text-slate-800 font-medium">' + escapeHtml(i.name) + '</td>' +
+        '<td class="py-3">' + categoryBadge(i.category) + '</td>' +
+        '<td class="py-3 text-slate-700">' + fmtMoney(i.price) + '</td>' +
+        '<td class="py-3 text-slate-500">' + i.date + '</td>' +
+        '<td class="py-3 text-slate-500 text-xs">' + expiryCell + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  renderCategoryCharts();
+}
+
+function renderCategoryCharts() {
+  const counts = {};
+  const values = {};
+  Object.keys(CATEGORIES).forEach(function(k) { counts[k] = 0; values[k] = 0; });
+  items.forEach(function(i) {
+    counts[i.category] = (counts[i.category] || 0) + 1;
+    values[i.category] = (values[i.category] || 0) + Number(i.price || 0);
+  });
+
+  const labels = Object.values(CATEGORIES).map(function(c) { return c.name; });
+  const colors = Object.values(CATEGORIES).map(function(c) { return c.color; });
+
+  if (charts.categoryPie) charts.categoryPie.destroy();
+  charts.categoryPie = new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: Object.values(counts), backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } } }
+  });
+
+  if (charts.categoryBar) charts.categoryBar.destroy();
+  charts.categoryBar = new Chart(document.getElementById('categoryValueChart'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: '花费金额', data: Object.values(values).map(function(v) { return Number(v.toFixed(2)); }), backgroundColor: colors, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '¥' + v; } } } } }
+  });
+}
+
+function renderItems() {
+  const grid = document.getElementById('itemsGrid');
+  const empty = document.getElementById('emptyItems');
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const catFilter = document.getElementById('filterCategory').value;
+  const sortBy = document.getElementById('sortBy').value;
+
+  let filtered = items.filter(function(i) {
+    if (catFilter && i.category !== catFilter) return false;
+    if (search && !(i.name.toLowerCase().indexOf(search) >= 0 || (i.notes || '').toLowerCase().indexOf(search) >= 0)) return false;
+    return true;
+  });
+
+  filtered.sort(function(a, b) {
+    switch(sortBy) {
+      case 'date_asc': return new Date(a.date) - new Date(b.date);
+      case 'date_desc': return new Date(b.date) - new Date(a.date);
+      case 'price_asc': return a.price - b.price;
+      case 'price_desc': return b.price - a.price;
+      case 'name_asc': return a.name.localeCompare(b.name);
+    }
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  grid.innerHTML = filtered.map(function(i) {
+    const c = CATEGORIES[i.category];
+    const expiryInfo = (c && c.needsExpiry) ? expiryBadge(i.expiry) : '';
+    const isExpired = i.expiry && getExpiryStatus(i.expiry) && getExpiryStatus(i.expiry).status === 'expired';
+    return '<div class="card-hover bg-white rounded-xl p-5 shadow-sm border border-slate-100 fade-in' + (isExpired ? ' border-red-200' : '') + '">' +
+      '<div class="flex justify-between items-start mb-3">' +
+      '<div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:' + c.color + '15;">' +
+      '<i class="fas ' + c.icon + '" style="color:' + c.color + '; font-size: 1.3rem;"></i></div>' +
+      '<div class="flex gap-1">' +
+      '<button onclick="editItem(\'' + i.id + '\')" class="text-slate-400 hover:text-purple-600 p-1"><i class="fas fa-edit"></i></button>' +
+      '<button onclick="deleteItem(\'' + i.id + '\')" class="text-slate-400 hover:text-red-600 p-1"><i class="fas fa-trash"></i></button>' +
+      '</div></div>' +
+      '<h4 class="font-semibold text-slate-800 mb-1">' + escapeHtml(i.name) + '</h4>' +
+      '<div class="flex items-center gap-2 mb-2 flex-wrap">' + categoryBadge(i.category) + expiryInfo + '</div>' +
+      '<div class="text-xl font-bold" style="color:' + c.color + ';">' + fmtMoney(i.price) + '</div>' +
+      '<div class="text-sm text-slate-500 mt-2 space-y-1">' +
+      '<div><i class="fas fa-calendar w-4"></i>' + i.date + '</div>' +
+      (i.expiry ? '<div><i class="fas fa-clock w-4"></i>保质期至 ' + i.expiry + '</div>' : '') +
+      (i.brand ? '<div><i class="fas fa-store w-4"></i>' + escapeHtml(i.brand) + '</div>' : '') +
+      (i.notes ? '<div class="truncate"><i class="fas fa-comment w-4"></i>' + escapeHtml(i.notes) + '</div>' : '') +
+      '</div></div>';
+  }).join('');
+}
+
+function renderStats() {
+  const counts = {};
+  const values = {};
+  Object.keys(CATEGORIES).forEach(function(k) { counts[k] = 0; values[k] = 0; });
+  items.forEach(function(i) {
+    counts[i.category] = (counts[i.category] || 0) + 1;
+    values[i.category] = (values[i.category] || 0) + Number(i.price || 0);
+  });
+
+  const maxCount = Math.max.apply(null, Object.values(counts).concat([1]));
+  const detail = document.getElementById('categoryDetail');
+  detail.innerHTML = Object.entries(CATEGORIES).map(function(entry) {
+    const key = entry[0], cat = entry[1];
+    const count = counts[key];
+    const value = values[key];
+    const pct = (count / maxCount * 100).toFixed(0);
+    return '<div>' +
+      '<div class="flex justify-between text-sm mb-1">' +
+      '<span class="font-medium text-slate-700">' + cat.name + '</span>' +
+      '<span class="text-slate-500">' + count + ' 件 · ' + fmtMoney(value) + '</span>' +
+      '</div>' +
+      '<div class="h-2 bg-slate-100 rounded-full overflow-hidden">' +
+      '<div class="h-full rounded-full transition-all" style="width:' + pct + '%; background:' + cat.color + ';"></div>' +
+      '</div></div>';
+  }).join('');
+
+  const top = items.slice().sort(function(a, b) { return b.price - a.price; }).slice(0, 5);
+  const topEl = document.getElementById('topItems');
+  if (top.length === 0) {
+    topEl.innerHTML = '<p class="text-center text-slate-400 py-4">暂无数据</p>';
+  } else {
+    const medals = ['🥇', '🥈', '🥉', '4.', '5.'];
+    topEl.innerHTML = top.map(function(i, idx) {
+      const c = CATEGORIES[i.category];
+      return '<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">' +
+        '<span class="text-lg w-8 text-center">' + medals[idx] + '</span>' +
+        '<div class="flex-1 min-w-0">' +
+        '<div class="font-medium text-slate-800 truncate">' + escapeHtml(i.name) + '</div>' +
+        '<div class="text-xs text-slate-500">' + c.name + ' · ' + i.date + '</div>' +
+        '</div>' +
+        '<div class="font-bold" style="color:' + c.color + ';">' + fmtMoney(i.price) + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  renderMonthlyChart();
+  renderPriceRangeChart();
+  renderExpiryWarnings();
+}
+
+function renderExpiryWarnings() {
+  const container = document.getElementById('expiryWarnings');
+  const expiringItems = items.filter(function(i) {
+    const cat = CATEGORIES[i.category];
+    return cat && cat.needsExpiry && i.expiry;
+  });
+
+  if (expiringItems.length === 0) {
+    container.innerHTML = '<p class="text-center text-slate-400 py-4 text-sm">暂无需要关注保质期的物品</p>';
+    return;
+  }
+
+  const groups = { expired: [], soon: [], normal: [] };
+  expiringItems.forEach(function(i) {
+    const info = getExpiryStatus(i.expiry);
+    if (info && groups[info.status]) {
+      groups[info.status].push({ item: i, info: info });
+    }
+  });
+
+  let html = '';
+
+  if (groups.expired.length > 0) {
+    html += '<div class="mb-3"><div class="flex items-center gap-2 mb-2 text-red-600 font-semibold text-sm"><i class="fas fa-times-circle"></i>已过期 (' + groups.expired.length + ')</div>';
+    html += groups.expired.map(function(g) {
+      const i = g.item;
+      const c = CATEGORIES[i.category];
+      return '<div class="flex items-center gap-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-sm">' +
+        '<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background:' + c.color + '20;"><i class="fas ' + c.icon + '" style="color:' + c.color + ';"></i></div>' +
+        '<div class="flex-1 min-w-0">' +
+        '<div class="font-medium text-slate-800 truncate">' + escapeHtml(i.name) + '</div>' +
+        '<div class="text-xs text-slate-500">保质期至 ' + i.expiry + ' · 过期 ' + Math.abs(g.info.days) + ' 天</div>' +
+        '</div>' +
+        '<span class="text-red-600 text-xs font-bold">已过期</span>' +
+        '</div>';
+    }).join('');
+    html += '</div>';
+  }
+
+  if (groups.soon.length > 0) {
+    html += '<div class="mb-3"><div class="flex items-center gap-2 mb-2 text-amber-600 font-semibold text-sm"><i class="fas fa-exclamation-triangle"></i>即将过期 (30天内, ' + groups.soon.length + ')</div>';
+    html += groups.soon.map(function(g) {
+      const i = g.item;
+      const c = CATEGORIES[i.category];
+      return '<div class="flex items-center gap-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">' +
+        '<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background:' + c.color + '20;"><i class="fas ' + c.icon + '" style="color:' + c.color + ';"></i></div>' +
+        '<div class="flex-1 min-w-0">' +
+        '<div class="font-medium text-slate-800 truncate">' + escapeHtml(i.name) + '</div>' +
+        '<div class="text-xs text-slate-500">保质期至 ' + i.expiry + ' · ' + g.info.days + ' 天后到期</div>' +
+        '</div>' +
+        '<span class="text-amber-600 text-xs font-bold">即将到期</span>' +
+        '</div>';
+    }).join('');
+    html += '</div>';
+  }
+
+  const normalItems = groups.normal.slice(0, 5);
+  if (normalItems.length > 0) {
+    html += '<div><div class="flex items-center gap-2 mb-2 text-green-600 font-semibold text-sm"><i class="fas fa-check-circle"></i>保质期内 (' + expiringItems.length + ' 件, 显示最近5件)</div>';
+    html += normalItems.map(function(g) {
+      const i = g.item;
+      const c = CATEGORIES[i.category];
+      return '<div class="flex items-center gap-3 p-2.5 bg-green-50 border border-green-200 rounded-lg text-sm">' +
+        '<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background:' + c.color + '20;"><i class="fas ' + c.icon + '" style="color:' + c.color + ';"></i></div>' +
+        '<div class="flex-1 min-w-0">' +
+        '<div class="font-medium text-slate-800 truncate">' + escapeHtml(i.name) + '</div>' +
+        '<div class="text-xs text-slate-500">保质期至 ' + i.expiry + '</div>' +
+        '</div>' +
+        '<span class="text-green-600 text-xs font-bold">正常</span>' +
+        '</div>';
+    }).join('');
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderMonthlyChart() {
+  const now = new Date();
+  const months = [];
+  const data = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push((d.getMonth() + 1) + '月');
+    const monthTotal = items.filter(function(it) {
+      const id = new Date(it.date);
+      return id.getFullYear() === d.getFullYear() && id.getMonth() === d.getMonth();
+    }).reduce(function(s, it) { return s + Number(it.price || 0); }, 0);
+    data.push(Number(monthTotal.toFixed(2)));
+  }
+
+  if (charts.monthly) charts.monthly.destroy();
+  charts.monthly = new Chart(document.getElementById('monthlyChart'), {
+    type: 'line',
+    data: { labels: months, datasets: [{ label: '月度花费', data: data, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3, pointBackgroundColor: '#8b5cf6', pointRadius: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '¥' + v; } } } } }
+  });
+}
+
+function renderPriceRangeChart() {
+  const ranges = [
+    { label: '0-50', min: 0, max: 50 },
+    { label: '50-200', min: 50, max: 200 },
+    { label: '200-500', min: 200, max: 500 },
+    { label: '500-1000', min: 500, max: 1000 },
+    { label: '1000+', min: 1000, max: Infinity }
+  ];
+  const data = ranges.map(function(r) {
+    return items.filter(function(i) { return Number(i.price) >= r.min && Number(i.price) < r.max; }).length;
+  });
+
+  if (charts.priceRange) charts.priceRange.destroy();
+  charts.priceRange = new Chart(document.getElementById('priceRangeChart'), {
+    type: 'bar',
+    data: { labels: ranges.map(function(r) { return r.label; }), datasets: [{ label: '物品数量', data: data, backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899'], borderRadius: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+}
+
+function openModal(item) {
+  const modal = document.getElementById('itemModal');
+  const form = document.getElementById('itemForm');
+  const title = document.getElementById('modalTitle');
+  const expiryWrap = document.getElementById('expiryFieldWrap');
+  const expiryInput = document.getElementById('itemExpiry');
+  const categorySel = document.getElementById('itemCategory');
+
+  function updateExpiryVisibility() {
+    const catKey = categorySel.value;
+    const cat = CATEGORIES[catKey];
+    if (cat && cat.needsExpiry) {
+      expiryWrap.classList.remove('hidden');
+      expiryInput.setAttribute('required', '');
+    } else {
+      expiryWrap.classList.add('hidden');
+      expiryInput.removeAttribute('required');
+    }
+  }
+
+  categorySel.onchange = updateExpiryVisibility;
+
+  if (item) {
+    title.textContent = '编辑物品';
+    document.getElementById('itemId').value = item.id;
+    document.getElementById('itemName').value = item.name;
+    document.getElementById('itemCategory').value = item.category;
+    document.getElementById('itemPrice').value = item.price;
+    document.getElementById('itemDate').value = item.date;
+    document.getElementById('itemBrand').value = item.brand || '';
+    document.getElementById('itemExpiry').value = item.expiry || '';
+    document.getElementById('itemNotes').value = item.notes || '';
+    updateExpiryVisibility();
+  } else {
+    title.textContent = '添加物品';
+    form.reset();
+    document.getElementById('itemId').value = '';
+    const today = new Date();
+    document.getElementById('itemDate').value = today.toISOString().split('T')[0];
+    document.getElementById('itemExpiry').value = '';
+    updateExpiryVisibility();
+  }
+  modal.classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('itemModal').classList.remove('show');
+}
+
+window.editItem = function(id) {
+  const item = items.find(function(i) { return i.id === id; });
+  if (item) openModal(item);
+};
+
+window.deleteItem = function(id) {
+  if (!confirm('确定要删除这个物品记录吗？')) return;
+  items = items.filter(function(i) { return i.id !== id; });
+  saveData();
+  refreshAll();
+  showToast('删除成功', 'success');
+};
+
+function handleSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('itemId').value;
+  const data = {
+    id: id || uuid(),
+    name: document.getElementById('itemName').value.trim(),
+    category: document.getElementById('itemCategory').value,
+    price: parseFloat(document.getElementById('itemPrice').value) || 0,
+    date: document.getElementById('itemDate').value,
+    brand: document.getElementById('itemBrand').value.trim(),
+    expiry: document.getElementById('itemExpiry').value || '',
+    notes: document.getElementById('itemNotes').value.trim()
+  };
+  if (id) {
+    const idx = items.findIndex(function(i) { return i.id === id; });
+    if (idx >= 0) items[idx] = data;
+    showToast('更新成功', 'success');
+  } else {
+    items.push(data);
+    showToast('添加成功', 'success');
+  }
+  saveData();
+  closeModal();
+  refreshAll();
+}
+
+function refreshAll() {
+  renderOverview();
+  renderItems();
+  renderStats();
+}
+
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+  document.getElementById('view-' + view).classList.add('active');
+
+  const tabs = ['overview', 'items', 'stats'];
+  tabs.forEach(function(t) {
+    const btn = document.getElementById('tab-btn-' + t);
+    const mBtn = document.getElementById('m-tab-' + t);
+    if (t === view) {
+      if (btn) { btn.classList.add('tab-active'); btn.classList.remove('text-slate-500'); }
+      if (mBtn) { mBtn.classList.add('text-purple-600', 'font-semibold'); mBtn.classList.remove('text-slate-500'); }
+    } else {
+      if (btn) { btn.classList.remove('tab-active'); btn.classList.add('text-slate-500'); }
+      if (mBtn) { mBtn.classList.remove('text-purple-600', 'font-semibold'); mBtn.classList.add('text-slate-500'); }
+    }
+  });
+
+  if (view === 'stats') renderStats();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(items, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '物品管理数据_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('导出成功', 'success');
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('格式错误');
+      if (confirm('导入 ' + data.length + ' 条记录？\n确定将覆盖现有数据。')) {
+        items = data;
+        saveData();
+        refreshAll();
+        showToast('导入成功', 'success');
+      }
+    } catch(err) {
+      showToast('导入失败：' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadSampleData() {
+  if (items.length > 0 && !confirm('将添加示例数据，是否继续？')) return;
+  const samples = [
+    { name: '优衣库 T恤', category: 'clothing', price: 99, date: '2025-01-15', brand: '优衣库', notes: '白色 M 码' },
+    { name: '耐克 Air Max', category: 'shoes', price: 899, date: '2025-02-10', brand: 'Nike', notes: '跑步鞋' },
+    { name: 'MacBook Pro', category: 'electronics', price: 15999, date: '2025-01-05', brand: 'Apple', notes: 'M3 Pro 14寸' },
+    { name: '爱奇艺会员', category: 'software', price: 198, date: '2025-03-01', brand: '爱奇艺', notes: '年卡' },
+    { name: '三只松鼠坚果礼盒', category: 'food', price: 128, date: '2025-02-20', brand: '三只松鼠', notes: '年货', expiry: '2026-06-30' },
+    { name: '京东 PLUS 会员', category: 'software', price: 149, date: '2025-03-15', brand: '京东', notes: '年卡' },
+    { name: '小米手环', category: 'electronics', price: 299, date: '2025-03-10', brand: '小米', notes: '8 Pro' },
+    { name: 'Zara 大衣', category: 'clothing', price: 1299, date: '2025-02-25', brand: 'Zara', notes: '羊毛大衣' },
+    { name: '星巴克咖啡豆', category: 'food', price: 168, date: '2025-03-20', brand: 'Starbucks', notes: '危地马拉产', expiry: '2025-12-15' },
+    { name: 'Adobe 全家桶', category: 'software', price: 888, date: '2025-01-20', brand: 'Adobe', notes: '年订阅' },
+    { name: 'Adidas 运动鞋', category: 'shoes', price: 699, date: '2025-03-05', brand: 'Adidas', notes: '黑色 42码' },
+    { name: 'Switch OLED', category: 'electronics', price: 2399, date: '2025-02-14', brand: 'Nintendo', notes: '白色主机' },
+    { name: '无印良品 床单', category: 'general', price: 299, date: '2025-03-18', brand: 'MUJI', notes: '1.8m 床' },
+    { name: '罗技鼠标', category: 'electronics', price: 499, date: '2025-03-22', brand: 'Logitech', notes: 'MX Master 3S' },
+    { name: '腾讯视频 VIP', category: 'software', price: 258, date: '2025-02-28', brand: '腾讯视频', notes: '年卡' },
+    { name: '布洛芬缓释胶囊', category: 'medicine', price: 28, date: '2025-03-01', brand: '中美史克', notes: '20粒/盒', expiry: '2026-03-01' },
+    { name: '维生素 C 片', category: 'medicine', price: 45, date: '2025-01-15', brand: '汤臣倍健', notes: '100片', expiry: '2025-09-30' },
+    { name: '阿莫西林胶囊', category: 'medicine', price: 18, date: '2024-08-01', brand: '石药集团', notes: '24粒', expiry: '2025-08-01' },
+    { name: '感冒灵颗粒', category: 'medicine', price: 15, date: '2025-02-10', brand: '三九医药', notes: '10袋装', expiry: '2026-02-10' },
+    { name: '牛奶', category: 'food', price: 69, date: '2025-07-25', brand: '蒙牛', notes: '特仑苏 250ml*12盒', expiry: '2025-08-25' }
+  ];
+  samples.forEach(function(s) {
+    if (items.find(function(x) { return x.name === s.name; })) return;
+    items.push({ id: uuid(), name: s.name, category: s.category, price: s.price, date: s.date, brand: s.brand, notes: s.notes, expiry: s.expiry || '' });
+  });
+  saveData();
+  refreshAll();
+  showToast('示例数据加载成功', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadData();
+  renderCategoryOptions();
+  refreshAll();
+
+  document.getElementById('btnAddItem').addEventListener('click', function() { openModal(); });
+  document.getElementById('btnAddItem2').addEventListener('click', function() { openModal(); });
+
+  document.getElementById('closeModal').addEventListener('click', closeModal);
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('itemModal').addEventListener('click', function(e) {
+    if (e.target.id === 'itemModal') closeModal();
+  });
+  document.getElementById('itemForm').addEventListener('submit', handleSubmit);
+
+  document.getElementById('searchInput').addEventListener('input', renderItems);
+  document.getElementById('filterCategory').addEventListener('change', renderItems);
+  document.getElementById('sortBy').addEventListener('change', renderItems);
+
+  document.getElementById('btnExport').addEventListener('click', exportData);
+  document.getElementById('btnImport').addEventListener('click', function() {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', function(e) {
+    if (e.target.files[0]) importData(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnSample').addEventListener('click', loadSampleData);
+});
+</script>
+
+</body>
+</html>

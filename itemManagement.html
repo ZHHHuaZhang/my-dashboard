@@ -105,6 +105,9 @@
       </nav>
 
       <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <button id="btnGiteeSync" class="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-lg text-xs sm:text-sm font-medium transition border border-orange-200 shadow-sm" title="Gitee 云端同步">
+          <i class="fa-solid fa-cloud"></i><span class="hidden sm:inline">Gitee</span>
+        </button>
         <button id="btnExport" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-xs sm:text-sm font-medium transition border border-slate-200" title="导出数据">
           <i class="fas fa-download"></i><span class="hidden sm:inline">导出</span>
         </button>
@@ -388,11 +391,66 @@
   </div>
 </div>
 
+<!-- Gitee Sync Modal -->
+<div class="modal-overlay" id="giteeModal" style="z-index: 9999;">
+  <div class="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100">
+    <div class="flex justify-between items-center border-b border-slate-100 px-5 py-4">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-cloud text-orange-500"></i>
+        <h3 class="font-bold text-slate-900 text-base">Gitee 云端同步</h3>
+      </div>
+      <button id="closeGiteeModal" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 flex items-center justify-center">&times;</button>
+    </div>
+
+    <div class="space-y-4 px-5 py-4">
+      <p class="text-xs text-slate-500">基于 Gitee OpenAPI，将您的物品数据安全同步到私人仓库。</p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Gitee 个人令牌</label>
+          <input type="password" id="gitee-token" placeholder="在 Gitee 设置中生成的 Token"
+                 class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none font-mono">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
+            <input type="text" id="gitee-user" placeholder="Gitee 用户名"
+                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">仓库名</label>
+            <input type="text" id="gitee-repo" placeholder="私人仓库名"
+                   class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+        </div>
+      </div>
+
+      <div id="gitee-status" class="text-xs p-3 rounded-xl hidden"></div>
+
+      <div class="flex justify-between items-center pt-2">
+        <a href="https://gitee.com/profile/personal_access_tokens" target="_blank" class="text-[11px] text-slate-500 hover:text-orange-600">
+          <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>前往获取令牌
+        </a>
+        <div class="flex space-x-2">
+          <button id="gitee-download-btn" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+            <i class="fa-solid fa-download mr-1"></i>从云端恢复
+          </button>
+          <button id="gitee-upload-btn" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold shadow-md disabled:opacity-50">
+            <i class="fa-solid fa-upload mr-1"></i>备份到云端
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
 const STORAGE_KEY = 'item_management_data_v1';
+const STORAGE_KEY_GITEE = 'item_management_gitee_config';
+const GITEE_FILE_PATH = 'item_management_data.json';
 
 const CATEGORIES = {
   clothing: { name: '衣物', color: '#ec4899', icon: 'fa-shirt' },
@@ -406,16 +464,23 @@ const CATEGORIES = {
 
 let items = [];
 let charts = {};
+let giteeConfig = { token: '', user: '', repo: 'my-item-data' };
 
 function loadData() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     items = data ? JSON.parse(data) : [];
   } catch(e) { items = []; }
+
+  try {
+    const giteeRaw = localStorage.getItem(STORAGE_KEY_GITEE);
+    if (giteeRaw) giteeConfig = Object.assign({}, giteeConfig, JSON.parse(giteeRaw));
+  } catch(e) { /* 配置损坏时保留默认值 */ }
 }
 
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(STORAGE_KEY_GITEE, JSON.stringify(giteeConfig));
 }
 
 function uuid() {
@@ -988,6 +1053,142 @@ function loadSampleData() {
   showToast('示例数据加载成功', 'success');
 }
 
+/* ===================== GITEE 云端同步 ===================== */
+function openGiteeSyncModal() {
+  document.getElementById('gitee-token').value = giteeConfig.token;
+  document.getElementById('gitee-user').value = giteeConfig.user;
+  document.getElementById('gitee-repo').value = giteeConfig.repo;
+  document.getElementById('gitee-status').classList.add('hidden');
+  document.getElementById('giteeModal').classList.add('show');
+}
+
+function closeGiteeSyncModal() {
+  document.getElementById('giteeModal').classList.remove('show');
+}
+
+function setGiteeStatus(msg, type) {
+  const el = document.getElementById('gitee-status');
+  el.classList.remove('hidden');
+  el.textContent = msg;
+  el.className = 'text-xs p-3 rounded-xl';
+  if (type === 'success') el.className += ' bg-emerald-50 text-emerald-700 border border-emerald-100';
+  else if (type === 'error') el.className += ' bg-rose-50 text-rose-700 border border-rose-100';
+  else if (type === 'warning') el.className += ' bg-amber-50 text-amber-700 border border-amber-100';
+  else el.className += ' bg-slate-50 text-slate-600';
+  setTimeout(function() { el.classList.add('hidden'); }, 5000);
+}
+
+function setGiteeButtons(disabled) {
+  document.getElementById('gitee-upload-btn').disabled = disabled;
+  document.getElementById('gitee-download-btn').disabled = disabled;
+}
+
+function readGiteeForm() {
+  return {
+    token: document.getElementById('gitee-token').value.trim(),
+    user: document.getElementById('gitee-user').value.trim(),
+    repo: document.getElementById('gitee-repo').value.trim()
+  };
+}
+
+async function getGiteeFileInfo(token, user, repo, path) {
+  const url = 'https://gitee.com/api/v5/repos/' + user + '/' + repo + '/contents/' + path + '?access_token=' + token;
+  const res = await fetch(url);
+  if (res.status === 200) return await res.json();
+  return null;
+}
+
+async function uploadToGitee() {
+  const cfg = readGiteeForm();
+  if (!cfg.token || !cfg.user || !cfg.repo) {
+    setGiteeStatus('请填写完整的 Gitee 配置信息！', 'warning');
+    return;
+  }
+  giteeConfig = cfg;
+  saveData();
+
+  setGiteeButtons(true);
+  setGiteeStatus('正在同步备份到 Gitee 云端...', 'info');
+  try {
+    const contentStr = JSON.stringify({ items: items }, null, 2);
+    const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, function(m, p1) {
+      return String.fromCharCode('0x' + p1);
+    }));
+
+    const fileInfo = await getGiteeFileInfo(cfg.token, cfg.user, cfg.repo, GITEE_FILE_PATH);
+    const bodyData = {
+      access_token: cfg.token,
+      content: base64Content,
+      message: 'Backup item management data',
+      sha: fileInfo ? fileInfo.sha : undefined
+    };
+
+    const response = await fetch('https://gitee.com/api/v5/repos/' + cfg.user + '/' + cfg.repo + '/contents/' + GITEE_FILE_PATH, {
+      method: fileInfo && fileInfo.sha ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyData)
+    });
+
+    if (response.ok) {
+      const now = new Date();
+      const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      setGiteeStatus('备份成功（' + timeStr + '）', 'success');
+      showToast('已备份 ' + items.length + ' 条记录到云端', 'success');
+    } else {
+      const err = await response.json();
+      setGiteeStatus('备份失败：' + (err.message || '请求异常'), 'error');
+    }
+  } catch(error) {
+    console.error('Gitee 上传失败:', error);
+    setGiteeStatus('连接 Gitee 失败，请检查网络和配置', 'error');
+  } finally {
+    setGiteeButtons(false);
+  }
+}
+
+async function downloadFromGitee() {
+  const cfg = readGiteeForm();
+  if (!cfg.token || !cfg.user || !cfg.repo) {
+    setGiteeStatus('请填写完整的 Gitee 配置信息！', 'warning');
+    return;
+  }
+  if (!confirm('从云端恢复将覆盖当前所有物品数据，确定继续吗？')) return;
+
+  giteeConfig = cfg;
+  saveData();
+
+  setGiteeButtons(true);
+  setGiteeStatus('正在从 Gitee 恢复数据...', 'info');
+  try {
+    const fileInfo = await getGiteeFileInfo(cfg.token, cfg.user, cfg.repo, GITEE_FILE_PATH);
+    if (fileInfo && fileInfo.content) {
+      const rawBin = atob(fileInfo.content);
+      const decodedStr = decodeURIComponent(Array.prototype.map.call(rawBin, function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const cloudData = JSON.parse(decodedStr);
+
+      if (cloudData.items && Array.isArray(cloudData.items)) {
+        items = cloudData.items;
+        saveData();
+        renderCategoryOptions();
+        refreshAll();
+        setGiteeStatus('数据恢复成功！', 'success');
+        showToast('已从云端恢复 ' + items.length + ' 条记录', 'success');
+      } else {
+        setGiteeStatus('云端数据格式异常', 'error');
+      }
+    } else {
+      setGiteeStatus('云端未找到同步文件', 'warning');
+    }
+  } catch(error) {
+    console.error('Gitee 下载失败:', error);
+    setGiteeStatus('获取数据失败，请检查网络和配置', 'error');
+  } finally {
+    setGiteeButtons(false);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   loadData();
   renderCategoryOptions();
@@ -1017,6 +1218,22 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   document.getElementById('btnSample').addEventListener('click', loadSampleData);
+
+  // Gitee 云端同步
+  document.getElementById('btnGiteeSync').addEventListener('click', openGiteeSyncModal);
+  document.getElementById('closeGiteeModal').addEventListener('click', closeGiteeSyncModal);
+  document.getElementById('giteeModal').addEventListener('click', function(e) {
+    if (e.target.id === 'giteeModal') closeGiteeSyncModal();
+  });
+  document.getElementById('gitee-upload-btn').addEventListener('click', uploadToGitee);
+  document.getElementById('gitee-download-btn').addEventListener('click', downloadFromGitee);
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('giteeModal').classList.contains('show')) closeGiteeSyncModal();
+    else if (document.getElementById('itemModal').classList.contains('show')) closeModal();
+  }
 });
 </script>
 

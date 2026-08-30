@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>广州日照罗盘 · 一年四季</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #0c1445 0%, #1a237e 30%, #283593 60%, #1a237e 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #fff;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #ffd54f, #ff8a65, #ffd54f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .subtitle {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+  }
+  
+  .container {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .compass-wrapper {
+    position: relative;
+    width: 520px;
+    height: 520px;
+  }
+  
+  .compass {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 40px rgba(255, 193, 7, 0.3));
+  }
+  
+  .info-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 32px;
+    width: 320px;
+  }
+  
+  .info-panel h2 {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
+  }
+  
+  .date-display {
+    font-size: 2rem;
+    font-weight: 300;
+    margin-bottom: 8px;
+    color: #ffd54f;
+  }
+  
+  .weekday-display {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 24px;
+  }
+  
+  .weather-card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    transition: all 0.3s ease;
+  }
+  
+  .weather-card.rainy {
+    background: rgba(33, 150, 243, 0.15);
+    border-color: rgba(33, 150, 243, 0.4);
+  }
+  
+  .weather-card.stormy {
+    background: rgba(63, 81, 181, 0.2);
+    border-color: rgba(63, 81, 181, 0.5);
+  }
+  
+  .weather-card.cloudy {
+    background: rgba(144, 164, 174, 0.15);
+    border-color: rgba(144, 164, 174, 0.35);
+  }
+  
+  .weather-card.sunny {
+    background: rgba(255, 193, 7, 0.12);
+    border-color: rgba(255, 193, 7, 0.3);
+  }
+  
+  .weather-card.unavailable {
+    opacity: 0.6;
+    font-style: italic;
+  }
+  
+  .weather-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .weather-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+  
+  .weather-temp {
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: #fff;
+  }
+  
+  .weather-desc {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-left: auto;
+  }
+  
+  .weather-detail {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  
+  .weather-warning {
+    color: #ef5350;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+  
+  .weather-ok {
+    color: #66bb6a;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+  
+  .forecast-card { margin-bottom:14px; padding:12px 14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; }
+  .forecast-title { font-size:0.8rem; color:rgba(255,255,255,0.6); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+  .forecast-range { font-size:0.72rem; color:rgba(255,255,255,0.4); }
+  .forecast-days { display:flex; gap:4px; justify-content:space-between; }
+  .forecast-day { flex:1; text-align:center; padding:8px 2px; border-radius:10px; background:rgba(255,255,255,0.04); transition:all 0.25s ease; cursor:pointer; position:relative; min-width:0; border:1px solid transparent; }
+  .forecast-day:hover:not(.unavailable) { background:rgba(255,255,255,0.1); transform:translateY(-2px); }
+  .forecast-day.selected { background:rgba(255,193,7,0.2); border:1px solid rgba(255,193,7,0.5); }
+  .forecast-day.unavailable { opacity:0.3; cursor:not-allowed; }
+  .forecast-day-name { font-size:0.68rem; color:rgba(255,255,255,0.6); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .forecast-day-date { font-size:0.6rem; color:rgba(255,255,255,0.35); margin-bottom:4px; }
+  .forecast-day-icon { font-size:1.2rem; line-height:1; margin-bottom:3px; display:block; }
+  .forecast-day-temp { font-size:0.7rem; color:#fff; font-weight:500; }
+  .forecast-day-sun { font-size:0.6rem; margin-top:3px; line-height:1; }
+  .sun-good { color:#66bb6a; }
+  .sun-bad { color:#ef5350; }
+  .sun-mid { color:#ffb74d; }
+  .forecast-day-windows { display:flex; gap:6px; justify-content:center; margin-top:4px; font-size:0.7rem; }
+  .forecast-day-windows .win-m, .forecast-day-windows .win-e { opacity:0.9; }
+  
+  .weather-good { color:#66bb6a; font-weight:500; margin-top:6px; }
+  .weather-mid { color:#ffb74d; font-weight:500; margin-top:6px; }
+  .weather-bad { color:#ef5350; font-weight:500; margin-top:6px; }
+  .weather-windows-detail { display:flex; gap:10px; margin-top:6px; font-size:0.72rem; color:rgba(255,255,255,0.7); }
+  .weather-windows-detail .win-detail { white-space:nowrap; }
+  
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .data-row:last-child { border-bottom: none; }
+  
+  .data-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.05em;
+  }
+  
+  .data-value {
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .data-value.highlight { color: #ffd54f; }
+  
+  .season-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  
+  .controls {
+    margin-top: 28px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: inherit;
+  }
+  
+  .btn:hover {
+    background: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.5);
+    transform: translateY(-2px);
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    border: none;
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #ffa726, #fb8c00);
+    box-shadow: 0 8px 20px rgba(255, 152, 0, 0.3);
+  }
+  
+  .slider-container {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 520px;
+  }
+  
+  input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    outline: none;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffd54f, #ff9800);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+  }
+  
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+  }
+  
+  @media (max-width: 900px) {
+    .container { flex-direction: column; }
+    .compass-wrapper { width: 340px; height: 340px; }
+    .info-panel { width: 100%; max-width: 340px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>广州日照罗盘</h1>
+<p class="subtitle">北纬23.13° · 一年四季 · 日夜交替</p>
+
+<div class="container">
+  <div class="compass-wrapper">
+    <svg class="compass" viewBox="0 0 520 520" id="compass"></svg>
+  </div>
+  
+  <div class="info-panel">
+    <h2>节气信息</h2>
+    <div class="date-display" id="dateDisplay">—</div>
+    <div class="weekday-display" id="weekdayDisplay">—</div>
+    
+    <div class="weather-card" id="weatherCard">
+      <div class="weather-main">
+        <span class="weather-icon" id="weatherIcon">☀️</span>
+        <span class="weather-temp" id="weatherTemp">—</span>
+        <span class="weather-desc" id="weatherDesc">加载中…</span>
+      </div>
+      <div class="weather-detail" id="weatherDetail"></div>
+    </div>
+    
+    <div class="forecast-card" id="forecastCard">
+      <div class="forecast-title">
+        <span>近七日日晒预报</span>
+        <span class="forecast-range" id="forecastRange"></span>
+      </div>
+      <div class="forecast-days" id="forecastDays">
+        <div class="forecast-day unavailable">
+          <div class="forecast-day-name">—</div>
+          <div class="forecast-day-date">—</div>
+          <span class="forecast-day-icon">—</span>
+          <div class="forecast-day-temp">—</div>
+          <div class="forecast-day-sun">—</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="data-row">
+      <span class="data-label">节气</span>
+      <span class="data-value" id="solarTerm">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label"><span class="season-indicator" id="seasonDot"></span>季节</span>
+      <span class="data-value" id="season">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">日出</span>
+      <span class="data-value" id="sunrise">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">日落</span>
+      <span class="data-value" id="sunset">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">日照时长</span>
+      <span class="data-value highlight" id="dayLength">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">夜长</span>
+      <span class="data-value" id="nightLength">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">与夏至差</span>
+      <span class="data-value" id="diffSolstice">—</span>
+    </div>
+    <div class="data-row" style="border-top: 1px solid rgba(255,255,255,0.15); margin-top: 10px; padding-top: 18px;">
+      <span class="data-label">🌅 晨光区间</span>
+      <span class="data-value highlight" id="morningGolden">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">🌇 黄金时刻</span>
+      <span class="data-value" id="eveningGolden" style="color:#ffb74d;">—</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">⚠️ UV危险</span>
+      <span class="data-value" style="color: #ef5350;">11:00-15:00</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">正午紫外线</span>
+      <span class="data-value" id="uvLevel">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="slider-container">
+  <input type="range" id="daySlider" min="1" max="365" value="1">
+</div>
+
+<div class="controls">
+  <button class="btn" onclick="setToday()">今天</button>
+  <button class="btn" onclick="prevDay()">前一天</button>
+  <button class="btn" onclick="nextDay()">后一天</button>
+  <button class="btn btn-primary" onclick="playAnimation()">播放全年</button>
+</div>
+
+<div class="legend" style="flex-wrap: wrap; justify-content: center; max-width: 520px;">
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(135deg, #ff9800, #ffc107);"></div>
+    <span>日照时长</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(135deg, #1a237e, #283593);"></div>
+    <span>夜晚时段</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(135deg, #c8e6c9, #81c784);"></div>
+    <span>晨光区间</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(135deg, #ffb74d, #ff8a65);"></div>
+    <span>黄金时刻</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(135deg, #ef5350, #c62828); opacity: 0.4;"></div>
+    <span>UV危险</span>
+  </div>
+</div>
+
+<script>
+const LAT = 23.1291;
+const LON = 113.2644;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const solarTerms = [
+  { name: '小寒', month: 1, day: 5 }, { name: '大寒', month: 1, day: 20 },
+  { name: '立春', month: 2, day: 4 }, { name: '雨水', month: 2, day: 19 },
+  { name: '惊蛰', month: 3, day: 6 }, { name: '春分', month: 3, day: 21 },
+  { name: '清明', month: 4, day: 5 }, { name: '谷雨', month: 4, day: 20 },
+  { name: '立夏', month: 5, day: 6 }, { name: '小满', month: 5, day: 21 },
+  { name: '芒种', month: 6, day: 6 }, { name: '夏至', month: 6, day: 21 },
+  { name: '小暑', month: 7, day: 7 }, { name: '大暑', month: 7, day: 23 },
+  { name: '立秋', month: 8, day: 8 }, { name: '处暑', month: 8, day: 23 },
+  { name: '白露', month: 9, day: 8 }, { name: '秋分', month: 9, day: 23 },
+  { name: '寒露', month: 10, day: 8 }, { name: '霜降', month: 10, day: 23 },
+  { name: '立冬', month: 11, day: 7 }, { name: '小雪', month: 11, day: 22 },
+  { name: '大雪', month: 12, day: 7 }, { name: '冬至', month: 12, day: 22 }
+];
+
+const months = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+
+let animationId = null;
+let animating = false;
+
+function d2r(d) { return d * Math.PI / 180; }
+function r2d(r) { return r * 180 / Math.PI; }
+
+function dayOfYear(month, day) {
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let doy = 0;
+  for (let i = 0; i < month - 1; i++) doy += days[i];
+  return doy + day;
+}
+
+function getSolarParams(doy) {
+  const n = doy;
+  const Jstar = n + (0 - 120 + 0) / 360;
+  const M = d2r(357.5291 + 0.98560028 * Jstar);
+  const C = d2r((1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)));
+  const lambda = M + C + d2r(180 + 102.9372);
+  const delta = Math.asin(Math.sin(lambda) * Math.sin(d2r(23.44)));
+  return { M, C, lambda, delta };
+}
+
+function getDeclination(doy) {
+  return getSolarParams(doy).delta;
+}
+
+function getEquationOfTime(doy) {
+  const params = getSolarParams(doy);
+  const y = Math.tan(d2r(23.44) / 2) ** 2;
+  const L = params.lambda;
+  const eot = r2d(y * Math.sin(2 * L) - 2 * 0.0167 * Math.sin(params.M) + 
+               4 * 0.0167 * y * Math.cos(params.M) * Math.cos(2 * L) - 
+               0.5 * y * y * Math.sin(4 * L) - 
+               1.25 * 0.0167 ** 2 * Math.sin(2 * params.M));
+  return eot * 4;
+}
+
+function calcSunTimes(doy) {
+  const params = getSolarParams(doy);
+  const delta = params.delta;
+  const eot = getEquationOfTime(doy);
+  
+  const Jtransit = 12 - (LON - 120) / 15 - eot / 60;
+  
+  const latRad = d2r(LAT);
+  
+  const sunRiseSetAngle = -d2r(0.83);
+  
+  const cosH = (Math.sin(sunRiseSetAngle) - Math.sin(latRad) * Math.sin(delta)) / 
+                (Math.cos(latRad) * Math.cos(delta));
+  
+  if (cosH > 1) {
+    return { sunrise: null, sunset: null, dayLength: 0, isPolarNight: true };
+  }
+  if (cosH < -1) {
+    return { sunrise: 0, sunset: 24, dayLength: 24, isPolarDay: true };
+  }
+  
+  const Hdeg = r2d(Math.acos(cosH));
+  
+  const Jset = Jtransit + Hdeg / 15;
+  const Jrise = Jtransit - Hdeg / 15;
+  
+  const sunrise = ((Jrise % 24) + 24) % 24;
+  const sunset = ((Jset % 24) + 24) % 24;
+  const dayLength = sunset - sunrise;
+  
+  return { sunrise, sunset, dayLength };
+}
+
+function formatTime(hours) {
+  if (hours === null || hours === undefined) return '极夜';
+  if (hours === 0) return '00:00';
+  if (hours === 24) return '24:00';
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function getGoldenWindows(sunData) {
+  if (sunData.dayLength < 0.5) return null;
+  
+  const morningEnd = Math.min(sunData.sunrise + 1, sunData.sunset);
+  const eveningStart = Math.max(sunData.sunset - 1, sunData.sunrise);
+  
+  return {
+    morning: { start: sunData.sunrise, end: morningEnd },
+    evening: { start: eveningStart, end: sunData.sunset }
+  };
+}
+
+function calcSolarElevation(doy, hour) {
+  const eqTime = getEquationOfTime(doy);
+  const solarTime = hour + (eqTime / 60) + (LON - 120) / 15;
+  const hourAngle = d2r(15 * (solarTime - 12));
+  const decl = getDeclination(doy);
+  const latRad = d2r(LAT);
+  const sinAlt = Math.sin(latRad) * Math.sin(decl) + 
+                 Math.cos(latRad) * Math.cos(decl) * Math.cos(hourAngle);
+  return r2d(Math.asin(sinAlt));
+}
+
+function getSeason(doy) {
+  const springEquinox = dayOfYear(3, 20);
+  const summerSolstice = dayOfYear(6, 21);
+  const autumnEquinox = dayOfYear(9, 22);
+  const winterSolstice = dayOfYear(12, 22);
+  
+  if (doy >= springEquinox && doy < summerSolstice) return { name: '春季', color: '#66bb6a' };
+  if (doy >= summerSolstice && doy < autumnEquinox) return { name: '夏季', color: '#ff7043' };
+  if (doy >= autumnEquinox && doy < winterSolstice) return { name: '秋季', color: '#ffa726' };
+  return { name: '冬季', color: '#5c6bc0' };
+}
+
+function getSolarTerm(doy) {
+  let nearest = null;
+  let minDiff = Infinity;
+  
+  for (const term of solarTerms) {
+    const termDoy = dayOfYear(term.month, term.day);
+    const diff = Math.abs(termDoy - doy);
+    if (diff < minDiff) {
+      minDiff = diff;
+      nearest = term;
+    }
+  }
+  
+  if (minDiff <= 3) {
+    return `${nearest.name}${minDiff === 0 ? '（今日）' : ''}`;
+  }
+  
+  let nextTerm = null;
+  for (const term of solarTerms) {
+    const termDoy = dayOfYear(term.month, term.day);
+    if (termDoy >= doy) {
+      nextTerm = term;
+      break;
+    }
+  }
+  if (!nextTerm) nextTerm = solarTerms[0];
+  
+  return `临近${nextTerm.name}`;
+}
+
+function doyToDate(doy) {
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let m = 0;
+  let remaining = doy;
+  while (remaining > days[m]) {
+    remaining -= days[m];
+    m++;
+  }
+  return { month: m + 1, day: remaining };
+}
+
+function getWeekday(doy) {
+  const base = new Date(2024, 0, 1);
+  base.setDate(base.getDate() + doy - 1);
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  return `星期${weekdays[base.getDay()]}`;
+}
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const rad = d2r(angleDeg - 90);
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcPath(cx, cy, rStart, rEnd, angleStart, angleEnd) {
+  const p1 = polarToCartesian(cx, cy, rEnd, angleStart);
+  const p2 = polarToCartesian(cx, cy, rEnd, angleEnd);
+  const p3 = polarToCartesian(cx, cy, rStart, angleEnd);
+  const p4 = polarToCartesian(cx, cy, rStart, angleStart);
+  const largeArc = angleEnd - angleStart > 180 ? 1 : 0;
+  
+  return [
+    `M ${p1.x} ${p1.y}`,
+    `A ${rEnd} ${rEnd} 0 ${largeArc} 1 ${p2.x} ${p2.y}`,
+    `L ${p3.x} ${p3.y}`,
+    `A ${rStart} ${rStart} 0 ${largeArc} 0 ${p4.x} ${p4.y}`,
+    'Z'
+  ].join(' ');
+}
+
+function renderCompass(doy) {
+  const svg = document.getElementById('compass');
+  svg.innerHTML = '';
+  
+  const cx = 260, cy = 260;
+  const rOuter = 240, rInner = 60;
+  const rDayBand = 200, rMonthBand = 230;
+  
+  const dayAngle = (doy / 365) * 360;
+  const sunData = calcSunTimes(doy);
+  const season = getSeason(doy);
+  
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  
+  const dayGrad = document.createElementNS(SVG_NS, 'linearGradient');
+  dayGrad.setAttribute('id', 'dayGrad');
+  dayGrad.setAttribute('x1', '0%'); dayGrad.setAttribute('y1', '0%');
+  dayGrad.setAttribute('x2', '100%'); dayGrad.setAttribute('y2', '100%');
+  dayGrad.innerHTML = `
+    <stop offset="0%" stop-color="#ffd54f"/>
+    <stop offset="50%" stop-color="#ff9800"/>
+    <stop offset="100%" stop-color="#ff5722"/>
+  `;
+  defs.appendChild(dayGrad);
+  
+  const nightGrad = document.createElementNS(SVG_NS, 'linearGradient');
+  nightGrad.setAttribute('id', 'nightGrad');
+  nightGrad.setAttribute('x1', '0%'); nightGrad.setAttribute('y1', '0%');
+  nightGrad.setAttribute('x2', '100%'); nightGrad.setAttribute('y2', '100%');
+  nightGrad.innerHTML = `
+    <stop offset="0%" stop-color="#1a237e"/>
+    <stop offset="100%" stop-color="#283593"/>
+  `;
+  defs.appendChild(nightGrad);
+  
+  const glowGrad = document.createElementNS(SVG_NS, 'radialGradient');
+  glowGrad.setAttribute('id', 'glowGrad');
+  glowGrad.setAttribute('cx', '50%'); glowGrad.setAttribute('cy', '50%');
+  glowGrad.setAttribute('r', '50%');
+  glowGrad.innerHTML = `
+    <stop offset="0%" stop-color="${season.color}" stop-opacity="0.6"/>
+    <stop offset="100%" stop-color="${season.color}" stop-opacity="0"/>
+  `;
+  defs.appendChild(glowGrad);
+  
+  svg.appendChild(defs);
+  
+  const glowCircle = document.createElementNS(SVG_NS, 'circle');
+  glowCircle.setAttribute('cx', cx);
+  glowCircle.setAttribute('cy', cy);
+  glowCircle.setAttribute('r', 250);
+  glowCircle.setAttribute('fill', 'url(#glowGrad)');
+  svg.appendChild(glowCircle);
+  
+  const bgCircle = document.createElementNS(SVG_NS, 'circle');
+  bgCircle.setAttribute('cx', cx);
+  bgCircle.setAttribute('cy', cy);
+  bgCircle.setAttribute('r', rOuter);
+  bgCircle.setAttribute('fill', 'rgba(255,255,255,0.03)');
+  bgCircle.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+  svg.appendChild(bgCircle);
+  
+  const nightBand = document.createElementNS(SVG_NS, 'circle');
+  nightBand.setAttribute('cx', cx);
+  nightBand.setAttribute('cy', cy);
+  nightBand.setAttribute('r', rDayBand);
+  nightBand.setAttribute('fill', 'none');
+  nightBand.setAttribute('stroke', 'url(#nightGrad)');
+  nightBand.setAttribute('stroke-width', '40');
+  svg.appendChild(nightBand);
+  
+  const sunriseAngle = sunData.sunrise !== null ? ((sunData.sunrise / 24) * 360) : 90;
+  const sunsetAngle = sunData.sunset !== null ? ((sunData.sunset / 24) * 360) : 270;
+  
+  const sunGrad = document.createElementNS(SVG_NS, 'linearGradient');
+  sunGrad.setAttribute('id', 'sunGrad_' + doy);
+  sunGrad.setAttribute('x1', '0%'); sunGrad.setAttribute('y1', '0%');
+  sunGrad.setAttribute('x2', '100%'); sunGrad.setAttribute('y2', '100%');
+  sunGrad.innerHTML = `
+    <stop offset="0%" stop-color="#fff59d"/>
+    <stop offset="30%" stop-color="#ffd54f"/>
+    <stop offset="70%" stop-color="#ff8f00"/>
+    <stop offset="100%" stop-color="#ff6f00"/>
+  `;
+  defs.appendChild(sunGrad);
+  
+  const goldenWindows = getGoldenWindows(sunData);
+  
+  if (sunData.dayLength > 0 && sunData.dayLength < 24) {
+    const dayArc = document.createElementNS(SVG_NS, 'path');
+    dayArc.setAttribute('d', arcPath(cx, cy, rDayBand - 20, rDayBand + 20, sunriseAngle, sunsetAngle));
+    dayArc.setAttribute('fill', 'url(#dayGrad)');
+    dayArc.setAttribute('opacity', '0.85');
+    svg.appendChild(dayArc);
+    
+    const morningGrad = document.createElementNS(SVG_NS, 'linearGradient');
+    morningGrad.setAttribute('id', 'morningGrad_' + doy);
+    morningGrad.setAttribute('x1', '0%'); morningGrad.setAttribute('y1', '0%');
+    morningGrad.setAttribute('x2', '100%'); morningGrad.setAttribute('y2', '100%');
+    morningGrad.innerHTML = `
+      <stop offset="0%" stop-color="#c8e6c9"/>
+      <stop offset="100%" stop-color="#81c784"/>
+    `;
+    defs.appendChild(morningGrad);
+    
+    const eveningGrad = document.createElementNS(SVG_NS, 'linearGradient');
+    eveningGrad.setAttribute('id', 'eveningGrad_' + doy);
+    eveningGrad.setAttribute('x1', '0%'); eveningGrad.setAttribute('y1', '0%');
+    eveningGrad.setAttribute('x2', '100%'); eveningGrad.setAttribute('y2', '100%');
+    eveningGrad.innerHTML = `
+      <stop offset="0%" stop-color="#ffb74d"/>
+      <stop offset="100%" stop-color="#ff8a65"/>
+    `;
+    defs.appendChild(eveningGrad);
+    
+    if (goldenWindows) {
+      const mStartAngle = (goldenWindows.morning.start / 24) * 360;
+      const mEndAngle = (goldenWindows.morning.end / 24) * 360;
+      
+      if (mEndAngle > mStartAngle && mEndAngle - mStartAngle > 0.5) {
+        const morningBand = document.createElementNS(SVG_NS, 'path');
+        morningBand.setAttribute('d', arcPath(cx, cy, rDayBand - 20, rDayBand + 20, mStartAngle, mEndAngle));
+        morningBand.setAttribute('fill', `url(#morningGrad_${doy})`);
+        morningBand.setAttribute('opacity', '0.9');
+        svg.appendChild(morningBand);
+        
+        const mLabelAngle = (mStartAngle + mEndAngle) / 2;
+        const mLabelPos = polarToCartesian(cx, cy, rDayBand + 32, mLabelAngle);
+        const mLabelText = document.createElementNS(SVG_NS, 'text');
+        mLabelText.setAttribute('x', mLabelPos.x);
+        mLabelText.setAttribute('y', mLabelPos.y);
+        mLabelText.setAttribute('text-anchor', 'middle');
+        mLabelText.setAttribute('dominant-baseline', 'middle');
+        mLabelText.setAttribute('fill', '#c8e6c9');
+        mLabelText.setAttribute('font-size', '9');
+        mLabelText.setAttribute('font-weight', '600');
+        mLabelText.textContent = '晨光';
+        svg.appendChild(mLabelText);
+      }
+      
+      const eStartAngle = (goldenWindows.evening.start / 24) * 360;
+      const eEndAngle = (goldenWindows.evening.end / 24) * 360;
+      
+      if (eEndAngle > eStartAngle && eEndAngle - eStartAngle > 0.5) {
+        const eveningBand = document.createElementNS(SVG_NS, 'path');
+        eveningBand.setAttribute('d', arcPath(cx, cy, rDayBand - 20, rDayBand + 20, eStartAngle, eEndAngle));
+        eveningBand.setAttribute('fill', `url(#eveningGrad_${doy})`);
+        eveningBand.setAttribute('opacity', '0.9');
+        svg.appendChild(eveningBand);
+        
+        const eLabelAngle = (eStartAngle + eEndAngle) / 2;
+        const eLabelPos = polarToCartesian(cx, cy, rDayBand + 32, eLabelAngle);
+        const eLabelText = document.createElementNS(SVG_NS, 'text');
+        eLabelText.setAttribute('x', eLabelPos.x);
+        eLabelText.setAttribute('y', eLabelPos.y);
+        eLabelText.setAttribute('text-anchor', 'middle');
+        eLabelText.setAttribute('dominant-baseline', 'middle');
+        eLabelText.setAttribute('fill', '#ffb74d');
+        eLabelText.setAttribute('font-size', '9');
+        eLabelText.setAttribute('font-weight', '600');
+        eLabelText.textContent = '黄金';
+        svg.appendChild(eLabelText);
+      }
+    }
+    
+    function drawDangerBand(startHour, endHour) {
+      const startAngle = (startHour / 24) * 360;
+      const endAngle = (endHour / 24) * 360;
+      
+      const effectiveStart = Math.max(startAngle, sunriseAngle);
+      const effectiveEnd = Math.min(endAngle, sunsetAngle);
+      
+      if (effectiveEnd > effectiveStart && effectiveEnd - effectiveStart > 1) {
+        const dangerGrad = document.createElementNS(SVG_NS, 'linearGradient');
+        dangerGrad.setAttribute('id', 'dangerGrad_' + doy);
+        dangerGrad.setAttribute('x1', '0%'); dangerGrad.setAttribute('y1', '0%');
+        dangerGrad.setAttribute('x2', '100%'); dangerGrad.setAttribute('y2', '100%');
+        dangerGrad.innerHTML = `
+          <stop offset="0%" stop-color="#ef5350" stop-opacity="0.4"/>
+          <stop offset="100%" stop-color="#c62828" stop-opacity="0.4"/>
+        `;
+        defs.appendChild(dangerGrad);
+        
+        const band = document.createElementNS(SVG_NS, 'path');
+        band.setAttribute('d', arcPath(cx, cy, rDayBand - 20, rDayBand + 20, effectiveStart, effectiveEnd));
+        band.setAttribute('fill', `url(#dangerGrad_${doy})`);
+        band.setAttribute('opacity', '0.35');
+        svg.appendChild(band);
+      }
+    }
+    
+    drawDangerBand(11, 15);
+    
+  } else if (sunData.dayLength === 24) {
+    const fullDay = document.createElementNS(SVG_NS, 'circle');
+    fullDay.setAttribute('cx', cx);
+    fullDay.setAttribute('cy', cy);
+    fullDay.setAttribute('r', rDayBand);
+    fullDay.setAttribute('fill', 'none');
+    fullDay.setAttribute('stroke', 'url(#dayGrad)');
+    fullDay.setAttribute('stroke-width', '40');
+    svg.appendChild(fullDay);
+  }
+  
+  const todayAngle = dayAngle;
+  const indicator = document.createElementNS(SVG_NS, 'path');
+  indicator.setAttribute('d', arcPath(cx, cy, rOuter + 5, rOuter + 18, todayAngle - 2, todayAngle + 2));
+  indicator.setAttribute('fill', '#ffd54f');
+  indicator.setAttribute('filter', 'url(#glowGrad)');
+  svg.appendChild(indicator);
+  
+  const tickGroup = document.createElementNS(SVG_NS, 'g');
+  
+  for (let i = 0; i < 365; i += 5) {
+    const angle = (i / 365) * 360;
+    const p1 = polarToCartesian(cx, cy, rOuter + 5, angle);
+    const p2 = polarToCartesian(cx, cy, rOuter + (i % 10 === 0 ? 15 : 10), angle);
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+    line.setAttribute('stroke', i % 10 === 0 ? 'rgba(255,213,79,0.8)' : 'rgba(255,255,255,0.3)');
+    line.setAttribute('stroke-width', i % 10 === 0 ? 1.5 : 0.8);
+    tickGroup.appendChild(line);
+  }
+  svg.appendChild(tickGroup);
+  
+  const monthLabels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  const monthGroup = document.createElementNS(SVG_NS, 'g');
+  
+  const monthStartDays = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+  for (let i = 0; i < 12; i++) {
+    const angle = (monthStartDays[i] / 365) * 360;
+    const p = polarToCartesian(cx, cy, rMonthBand, angle);
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', p.x);
+    text.setAttribute('y', p.y);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('fill', 'rgba(255,255,255,0.7)');
+    text.setAttribute('font-size', '12');
+    text.setAttribute('font-weight', '500');
+    text.textContent = monthLabels[i];
+    monthGroup.appendChild(text);
+  }
+  svg.appendChild(monthGroup);
+  
+  const seasonRing = document.createElementNS(SVG_NS, 'circle');
+  seasonRing.setAttribute('cx', cx);
+  seasonRing.setAttribute('cy', cy);
+  seasonRing.setAttribute('r', rInner + 30);
+  seasonRing.setAttribute('fill', 'none');
+  seasonRing.setAttribute('stroke', season.color);
+  seasonRing.setAttribute('stroke-width', '2');
+  seasonRing.setAttribute('opacity', '0.5');
+  svg.appendChild(seasonRing);
+  
+  const centerCircle = document.createElementNS(SVG_NS, 'circle');
+  centerCircle.setAttribute('cx', cx);
+  centerCircle.setAttribute('cy', cy);
+  centerCircle.setAttribute('r', rInner);
+  centerCircle.setAttribute('fill', 'rgba(255,255,255,0.08)');
+  centerCircle.setAttribute('stroke', season.color);
+  centerCircle.setAttribute('stroke-width', '2');
+  svg.appendChild(centerCircle);
+  
+  const dateInfo = doyToDate(doy);
+  
+  const centerDate = document.createElementNS(SVG_NS, 'text');
+  centerDate.setAttribute('x', cx);
+  centerDate.setAttribute('y', cy - 20);
+  centerDate.setAttribute('text-anchor', 'middle');
+  centerDate.setAttribute('fill', '#ffd54f');
+  centerDate.setAttribute('font-size', '28');
+  centerDate.setAttribute('font-weight', '300');
+  centerDate.textContent = `${dateInfo.month}/${dateInfo.day}`;
+  svg.appendChild(centerDate);
+  
+  const centerDay = document.createElementNS(SVG_NS, 'text');
+  centerDay.setAttribute('x', cx);
+  centerDay.setAttribute('y', cy + 12);
+  centerDay.setAttribute('text-anchor', 'middle');
+  centerDay.setAttribute('fill', 'rgba(255,255,255,0.6)');
+  centerDay.setAttribute('font-size', '11');
+  centerDay.textContent = `第 ${doy} 天`;
+  svg.appendChild(centerDay);
+  
+  const centerDayLen = document.createElementNS(SVG_NS, 'text');
+  centerDayLen.setAttribute('x', cx);
+  centerDayLen.setAttribute('y', cy + 32);
+  centerDayLen.setAttribute('text-anchor', 'middle');
+  centerDayLen.setAttribute('fill', '#fff');
+  centerDayLen.setAttribute('font-size', '13');
+  centerDayLen.setAttribute('font-weight', '500');
+  centerDayLen.textContent = `${sunData.dayLength.toFixed(1)}h`;
+  svg.appendChild(centerDayLen);
+  
+  const centerBestTime = document.createElementNS(SVG_NS, 'text');
+  centerBestTime.setAttribute('x', cx);
+  centerBestTime.setAttribute('y', cy + 52);
+  centerBestTime.setAttribute('text-anchor', 'middle');
+  centerBestTime.setAttribute('font-size', '9');
+  centerBestTime.setAttribute('font-weight', '500');
+  if (goldenWindows) {
+    const mElev = calcSolarElevation(doy, (goldenWindows.morning.start + goldenWindows.morning.end) / 2);
+    const eElev = calcSolarElevation(doy, (goldenWindows.evening.start + goldenWindows.evening.end) / 2);
+    const bestLabel = mElev > eElev ? '晨光更佳' : '黄金更佳';
+    const bestColor = mElev > eElev ? '#c8e6c9' : '#ffb74d';
+    centerBestTime.setAttribute('fill', bestColor);
+    centerBestTime.textContent = bestLabel;
+  } else {
+    centerBestTime.setAttribute('fill', 'rgba(255,255,255,0.4)');
+    centerBestTime.textContent = '极夜';
+  }
+  svg.appendChild(centerBestTime);
+  
+  const longestDay = calcSunTimes(dayOfYear(6, 21)).dayLength;
+  const diff = sunData.dayLength - longestDay;
+  
+  function getUVLevel(doy) {
+    const noonElev = calcSolarElevation(doy, 12);
+    let uv = 0;
+    if (noonElev > 80) uv = 11;
+    else if (noonElev > 70) uv = 10;
+    else if (noonElev > 60) uv = 9;
+    else if (noonElev > 50) uv = 8;
+    else if (noonElev > 40) uv = 7;
+    else if (noonElev > 30) uv = 6;
+    else if (noonElev > 20) uv = 5;
+    else if (noonElev > 10) uv = 3;
+    else if (noonElev > 0) uv = 1;
+    else uv = 0;
+    return { value: uv, elev: noonElev };
+  }
+  
+  function getUVAdvice(uv) {
+    if (uv >= 11) return { text: `${uv}+ 极高`, color: '#d32f2f', note: '避免户外活动' };
+    if (uv >= 8) return { text: `${uv} 很高`, color: '#f57c00', note: '需严密防护' };
+    if (uv >= 6) return { text: `${uv} 高`, color: '#fbc02d', note: '涂抹防晒霜' };
+    if (uv >= 3) return { text: `${uv} 中等`, color: '#fdd835', note: '建议防护' };
+    if (uv >= 1) return { text: `${uv} 低`, color: '#aed581', note: '可放心日晒' };
+    return { text: `0 极低`, color: '#81c784', note: '无需防护' };
+  }
+  
+  const uv = getUVLevel(doy);
+  const uvAdvice = getUVAdvice(uv.value);
+  
+  function getBestSunTime(sunData) {
+    if (!goldenWindows) return { morning: '极夜', evening: '极夜' };
+    
+    const mStartStr = formatTime(goldenWindows.morning.start);
+    const mEndStr = formatTime(goldenWindows.morning.end);
+    const eStartStr = formatTime(goldenWindows.evening.start);
+    const eEndStr = formatTime(goldenWindows.evening.end);
+    
+    const mElev = calcSolarElevation(doy, (goldenWindows.morning.start + goldenWindows.morning.end) / 2);
+    const eElev = calcSolarElevation(doy, (goldenWindows.evening.start + goldenWindows.evening.end) / 2);
+    
+    return {
+      morning: `${mStartStr} → ${mEndStr}（${mElev.toFixed(0)}°）`,
+      evening: `${eStartStr} → ${eEndStr}（${eElev.toFixed(0)}°）`
+    };
+  }
+  
+  const bestSunInfo = getBestSunTime(sunData);
+  
+  document.getElementById('dateDisplay').textContent = 
+    `${dateInfo.month}月${dateInfo.day}日`;
+  document.getElementById('weekdayDisplay').textContent = getWeekday(doy);
+  document.getElementById('solarTerm').textContent = getSolarTerm(doy);
+  document.getElementById('season').textContent = season.name;
+  document.getElementById('seasonDot').style.background = season.color;
+  document.getElementById('sunrise').textContent = formatTime(sunData.sunrise);
+  document.getElementById('sunset').textContent = formatTime(sunData.sunset);
+  document.getElementById('dayLength').textContent = 
+    `${Math.floor(sunData.dayLength)}时${Math.round((sunData.dayLength % 1) * 60)}分`;
+  document.getElementById('nightLength').textContent = 
+    `${Math.floor(24 - sunData.dayLength)}时${Math.round((24 - sunData.dayLength) % 1 * 60)}分`;
+  document.getElementById('diffSolstice').textContent = 
+    `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} 小时`;
+  document.getElementById('morningGolden').textContent = bestSunInfo.morning;
+  document.getElementById('eveningGolden').textContent = bestSunInfo.evening;
+  document.getElementById('uvLevel').textContent = uvAdvice.text;
+  document.getElementById('uvLevel').style.color = uvAdvice.color;
+  document.getElementById('uvLevel').title = `正午太阳高度角 ${uv.elev.toFixed(0)}° · ${uvAdvice.note}`;
+  
+  document.getElementById('daySlider').value = doy;
+  
+  updateWeatherForDoy(doy);
+}
+
+let currentWeather = null;
+let forecastDoyStart = null;
+
+function getForecastStartDoy() {
+  const now = new Date();
+  return dayOfYear(now.getMonth() + 1, now.getDate());
+}
+
+async function fetchWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=7&timezone=auto`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Weather API error');
+    const data = await resp.json();
+    currentWeather = data;
+    forecastDoyStart = getForecastStartDoy();
+    updateWeatherUI();
+    renderForecast();
+    const currentDoy = parseInt(document.getElementById('daySlider').value);
+    updateWeatherForDoy(currentDoy);
+  } catch (err) {
+    const desc = document.getElementById('weatherDesc');
+    const detail = document.getElementById('weatherDetail');
+    desc.textContent = '天气获取失败';
+    detail.textContent = '请检查网络连接';
+    detail.className = 'weather-detail';
+    const card = document.getElementById('weatherCard');
+    card.className = 'weather-card unavailable';
+  }
+}
+
+function interpretWeather(code) {
+  const weatherMap = {
+    0:  { icon: '☀️', desc: '晴朗', type: 'sunny', canSunbathe: true },
+    1:  { icon: '🌤️', desc: '大部晴朗', type: 'sunny', canSunbathe: true },
+    2:  { icon: '⛅', desc: '多云', type: 'cloudy', canSunbathe: true },
+    3:  { icon: '☁️', desc: '阴天', type: 'cloudy', canSunbathe: false },
+    45: { icon: '🌫️', desc: '雾', type: 'cloudy', canSunbathe: false },
+    48: { icon: '🌫️', desc: '冻雾', type: 'cloudy', canSunbathe: false },
+    51: { icon: '🌦️', desc: '小毛毛雨', type: 'rainy', canSunbathe: false },
+    53: { icon: '🌦️', desc: '毛毛雨', type: 'rainy', canSunbathe: false },
+    55: { icon: '🌧️', desc: '大毛毛雨', type: 'rainy', canSunbathe: false },
+    56: { icon: '🌧️', desc: '冻毛毛雨', type: 'rainy', canSunbathe: false },
+    57: { icon: '🌧️', desc: '强冻毛毛雨', type: 'rainy', canSunbathe: false },
+    61: { icon: '🌦️', desc: '小雨', type: 'rainy', canSunbathe: false },
+    63: { icon: '🌧️', desc: '中雨', type: 'rainy', canSunbathe: false },
+    65: { icon: '🌧️', desc: '大雨', type: 'rainy', canSunbathe: false },
+    66: { icon: '🌧️', desc: '冻雨', type: 'rainy', canSunbathe: false },
+    67: { icon: '🌧️', desc: '强冻雨', type: 'rainy', canSunbathe: false },
+    71: { icon: '🌨️', desc: '小雪', type: 'rainy', canSunbathe: false },
+    73: { icon: '🌨️', desc: '中雪', type: 'rainy', canSunbathe: false },
+    75: { icon: '❄️', desc: '大雪', type: 'rainy', canSunbathe: false },
+    77: { icon: '🌨️', desc: '雪粒', type: 'rainy', canSunbathe: false },
+    80: { icon: '🌦️', desc: '阵雨', type: 'rainy', canSunbathe: false },
+    81: { icon: '🌧️', desc: '较大阵雨', type: 'rainy', canSunbathe: false },
+    82: { icon: '⛈️', desc: '强阵雨', type: 'rainy', canSunbathe: false },
+    85: { icon: '🌨️', desc: '小阵雪', type: 'rainy', canSunbathe: false },
+    86: { icon: '❄️', desc: '强阵雪', type: 'rainy', canSunbathe: false },
+    95: { icon: '⛈️', desc: '雷暴', type: 'stormy', canSunbathe: false },
+    96: { icon: '⛈️', desc: '雷暴伴小冰雹', type: 'stormy', canSunbathe: false },
+    99: { icon: '⛈️', desc: '雷暴伴大冰雹', type: 'stormy', canSunbathe: false }
+  };
+  return weatherMap[code] || { icon: '❓', desc: '未知', type: 'cloudy', canSunbathe: true };
+}
+
+function evaluateSunbathing(sunData, weatherCode, doy) {
+  const weather = interpretWeather(weatherCode);
+  const windows = getGoldenWindows(sunData);
+  
+  if (!windows) {
+    return {
+      overall: 'bad',
+      morning: { status: 'bad', label: '极夜', elev: 0 },
+      evening: { status: 'bad', label: '极夜', elev: 0 }
+    };
+  }
+  
+  function assessWindow(window) {
+    const midHour = (window.start + window.end) / 2;
+    const elev = calcSolarElevation(doy, midHour);
+    
+    if (!weather.canSunbathe) {
+      return { status: 'bad', label: '下雨', elev };
+    }
+    
+    if (weather.type === 'cloudy') {
+      if (elev < 5) return { status: 'bad', label: '云厚光弱', elev };
+      if (elev < 15) return { status: 'mid', label: '有限', elev };
+      return { status: 'mid', label: '可用', elev };
+    }
+    
+    if (elev < 3) return { status: 'bad', label: '光度不足', elev };
+    if (elev < 10) return { status: 'mid', label: '较弱', elev };
+    return { status: 'good', label: '充足', elev };
+  }
+  
+  const m = assessWindow(windows.morning);
+  const e = assessWindow(windows.evening);
+  
+  let overall;
+  if (m.status === 'good' && e.status === 'good') overall = 'good';
+  else if (m.status === 'good' || e.status === 'good') overall = 'good';
+  else if (m.status === 'mid' || e.status === 'mid') overall = 'mid';
+  else overall = 'bad';
+  
+  return { overall, morning: m, evening: e };
+}
+
+function getWeatherForDoy(doy) {
+  if (!currentWeather || !forecastDoyStart) return null;
+  const offset = doy - forecastDoyStart;
+  if (offset < 0 || offset > 6) return null;
+  const daily = currentWeather.daily;
+  return {
+    weather_code: daily.weather_code[offset],
+    temp_max: daily.temperature_2m_max[offset],
+    temp_min: daily.temperature_2m_min[offset],
+    precipitation: daily.precipitation_sum[offset],
+    date: daily.time[offset]
+  };
+}
+
+function updateWeatherUI() {
+  if (!currentWeather) return;
+  
+  const current = currentWeather.current;
+  const daily = currentWeather.daily;
+  const info = interpretWeather(current.weather_code);
+  
+  const card = document.getElementById('weatherCard');
+  card.className = 'weather-card ' + info.type;
+  
+  document.getElementById('weatherIcon').textContent = info.icon;
+  document.getElementById('weatherTemp').textContent = `${Math.round(current.temperature_2m)}°C`;
+  document.getElementById('weatherDesc').textContent = info.desc;
+  
+  const humidity = current.relative_humidity_2m;
+  const wind = Math.round(current.wind_speed_10m);
+  const precip = daily && daily.precipitation_sum ? daily.precipitation_sum[0] : 0;
+  
+  let detailHtml = `湿度 ${humidity}% · 风速 ${wind} km/h`;
+  if (precip > 0) {
+    detailHtml += ` · 今日降水 ${precip}mm`;
+  }
+  
+  if (!info.canSunbathe) {
+    detailHtml += '<div class="weather-warning">⛔ 今日不可日晒</div>';
+  } else if (info.type === 'cloudy') {
+    detailHtml += '<div class="weather-ok">☀️ 云层较厚，日晒有限</div>';
+  } else {
+    detailHtml += '<div class="weather-ok">✅ 适合晒太阳</div>';
+  }
+  
+  document.getElementById('weatherDetail').innerHTML = detailHtml;
+}
+
+function renderForecast() {
+  const container = document.getElementById('forecastDays');
+  const rangeLabel = document.getElementById('forecastRange');
+  
+  if (!currentWeather || !forecastDoyStart) {
+    rangeLabel.textContent = '';
+    container.innerHTML = '<div class="forecast-day unavailable"><div class="forecast-day-name">加载中</div><div class="forecast-day-date">—</div><span class="forecast-day-icon">—</span><div class="forecast-day-temp">—</div><div class="forecast-day-sun">—</div></div>';
+    return;
+  }
+  
+  const daily = currentWeather.daily;
+  const todayDoy = forecastDoyStart;
+  const selectedDoy = parseInt(document.getElementById('daySlider').value);
+  
+  const today = new Date();
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  
+  const startDate = new Date(today);
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + 6);
+  rangeLabel.textContent = `${startDate.getMonth() + 1}/${startDate.getDate()} - ${endDate.getMonth() + 1}/${endDate.getDate()}`;
+  
+  container.innerHTML = '';
+  
+  for (let i = 0; i < 7; i++) {
+    const doy = todayDoy + i;
+    const date = new Date(today);
+    date.setDate(date.getDate() + i);
+    
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'forecast-day';
+    
+    const isSelected = (doy === selectedDoy);
+    if (isSelected) dayDiv.classList.add('selected');
+    
+    const wCode = daily.weather_code[i];
+    const info = interpretWeather(wCode);
+    const tempMax = Math.round(daily.temperature_2m_max[i]);
+    
+    const sunData = calcSunTimes(doy);
+    const evalResult = evaluateSunbathing(sunData, wCode, doy);
+    
+    const overallIcon = evalResult.overall === 'good' ? '✅' :
+                        evalResult.overall === 'mid' ? '☀️' : '⛔';
+    const overallLabel = evalResult.overall === 'good' ? '适合' :
+                         evalResult.overall === 'mid' ? '有限' : '不可';
+    const overallClass = 'sun-' + evalResult.overall;
+    
+    const mIcon = evalResult.morning.status === 'good' ? '🌅' :
+                  evalResult.morning.status === 'mid' ? '🌤️' : '⛔';
+    const eIcon = evalResult.evening.status === 'good' ? '🌇' :
+                  evalResult.evening.status === 'mid' ? '🌤️' : '⛔';
+    
+    const dayName = i === 0 ? '今天' : weekdays[date.getDay()];
+    
+    dayDiv.innerHTML = `
+      <div class="forecast-day-name">${dayName}</div>
+      <div class="forecast-day-date">${date.getMonth() + 1}/${date.getDate()}</div>
+      <span class="forecast-day-icon">${info.icon}</span>
+      <div class="forecast-day-temp">${tempMax}°</div>
+      <div class="forecast-day-sun ${overallClass}" title="晨光: ${evalResult.morning.label} · 傍晚: ${evalResult.evening.label}">
+        ${overallIcon} ${overallLabel}
+      </div>
+      <div class="forecast-day-windows">
+        <span class="win-m" title="晨光区间 ${evalResult.morning.elev.toFixed(0)}°">${mIcon}</span>
+        <span class="win-e" title="傍晚区间 ${evalResult.evening.elev.toFixed(0)}°">${eIcon}</span>
+      </div>
+    `;
+    
+    dayDiv.addEventListener('click', () => {
+      renderCompass(doy);
+      stopAnimation();
+    });
+    
+    container.appendChild(dayDiv);
+  }
+}
+
+function updateWeatherForDoy(doy) {
+  const weatherData = getWeatherForDoy(doy);
+  const sunData = calcSunTimes(doy);
+  
+  const morningEl = document.getElementById('morningGolden');
+  const eveningEl = document.getElementById('eveningGolden');
+  
+  if (!weatherData) {
+    const card = document.getElementById('weatherCard');
+    card.className = 'weather-card unavailable';
+    document.getElementById('weatherIcon').textContent = '📅';
+    document.getElementById('weatherTemp').textContent = '—';
+    document.getElementById('weatherDesc').textContent = '预报范围外';
+    document.getElementById('weatherDetail').innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">天气数据仅覆盖今日起7日，远期日期无实时天气</span>';
+    
+    if (morningEl.dataset.originalText) {
+      morningEl.textContent = morningEl.dataset.originalText;
+      delete morningEl.dataset.originalText;
+    }
+    if (eveningEl.dataset.originalText) {
+      eveningEl.textContent = eveningEl.dataset.originalText;
+      delete eveningEl.dataset.originalText;
+    }
+    morningEl.style.color = '';
+    eveningEl.style.color = '#ffb74d';
+    delete morningEl.dataset.evalMarked;
+    delete eveningEl.dataset.evalMarked;
+    renderForecast();
+    return;
+  }
+  
+  const info = interpretWeather(weatherData.weather_code);
+  const evalResult = evaluateSunbathing(sunData, weatherData.weather_code, doy);
+  
+  if (morningEl.textContent) {
+    morningEl.dataset.originalText = morningEl.textContent;
+  }
+  if (eveningEl.textContent) {
+    eveningEl.dataset.originalText = eveningEl.textContent;
+  }
+  
+  morningEl.dataset.evalMarked = '1';
+  eveningEl.dataset.evalMarked = '1';
+  
+  const card = document.getElementById('weatherCard');
+  card.className = 'weather-card ' + info.type;
+  
+  document.getElementById('weatherIcon').textContent = info.icon;
+  document.getElementById('weatherTemp').textContent = `${Math.round(weatherData.temp_max)}°`;
+  document.getElementById('weatherDesc').textContent = info.desc;
+  
+  let detailHtml = `最高 ${Math.round(weatherData.temp_max)}° · 最低 ${Math.round(weatherData.temp_min)}°`;
+  if (weatherData.precipitation > 0) {
+    detailHtml += ` · 降水 ${weatherData.precipitation}mm`;
+  }
+  
+  const overallLabel = evalResult.overall === 'good' ? '适合' :
+                       evalResult.overall === 'mid' ? '有限' : '不可';
+  const overallIcon = evalResult.overall === 'good' ? '✅' :
+                      evalResult.overall === 'mid' ? '☀️' : '⛔';
+  detailHtml += `<div class="weather-${evalResult.overall}">${overallIcon} 全日照${overallLabel}</div>`;
+  
+  detailHtml += '<div class="weather-windows-detail">';
+  detailHtml += `<span class="win-detail">🌅 晨光 ${evalResult.morning.label}(${evalResult.morning.elev.toFixed(0)}°)</span>`;
+  detailHtml += `<span class="win-detail">🌇 傍晚 ${evalResult.evening.label}(${evalResult.evening.elev.toFixed(0)}°)</span>`;
+  detailHtml += '</div>';
+  
+  document.getElementById('weatherDetail').innerHTML = detailHtml;
+  
+  const mStatus = evalResult.morning;
+  const eStatus = evalResult.evening;
+  
+  function statusIcon(status) {
+    return status === 'good' ? '✅' : status === 'mid' ? '☀️' : '⛔';
+  }
+  
+  morningEl.textContent = `${statusIcon(mStatus.status)} ${mStatus.label}(${mStatus.elev.toFixed(0)}°)`;
+  eveningEl.textContent = `${statusIcon(eStatus.status)} ${eStatus.label}(${eStatus.elev.toFixed(0)}°)`;
+  
+  morningEl.style.color = mStatus.status === 'good' ? '#66bb6a' : mStatus.status === 'mid' ? '#ffb74d' : '#ef5350';
+  eveningEl.style.color = eStatus.status === 'good' ? '#66bb6a' : eStatus.status === 'mid' ? '#ffb74d' : '#ef5350';
+  
+  renderForecast();
+}
+
+function setToday() {
+  const now = new Date();
+  const doy = dayOfYear(now.getMonth() + 1, now.getDate());
+  renderCompass(doy);
+  stopAnimation();
+}
+
+function prevDay() {
+  const current = parseInt(document.getElementById('daySlider').value);
+  renderCompass(current <= 1 ? 365 : current - 1);
+  stopAnimation();
+}
+
+function nextDay() {
+  const current = parseInt(document.getElementById('daySlider').value);
+  renderCompass(current >= 365 ? 1 : current + 1);
+  stopAnimation();
+}
+
+function stopAnimation() {
+  animating = false;
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+}
+
+function playAnimation() {
+  if (animating) {
+    stopAnimation();
+    return;
+  }
+  animating = true;
+  let doy = parseInt(document.getElementById('daySlider').value);
+  
+  function animate() {
+    if (!animating) return;
+    doy = doy >= 365 ? 1 : doy + 1;
+    renderCompass(doy);
+    animationId = setTimeout(animate, 80);
+  }
+  animate();
+}
+
+document.getElementById('daySlider').addEventListener('input', (e) => {
+  renderCompass(parseInt(e.target.value));
+  stopAnimation();
+});
+
+const todayDoy = dayOfYear(new Date().getMonth() + 1, new Date().getDate());
+renderCompass(todayDoy);
+fetchWeather();
+setInterval(fetchWeather, 30 * 60 * 1000);
+</script>
+
+</body>
+</html>

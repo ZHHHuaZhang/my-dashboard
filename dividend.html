@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js for professional compound interest visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/cloudbase-sdk.js"></script>
+    <script src="assets/cloudbase-sync.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -1898,6 +1900,24 @@
                 typingTimer = setTimeout(() => {
                     saveResolution();
                 }, 1500);
+            });
+
+            // ===================== CLOUDBASE 云同步 =====================
+            CloudSync.attach({
+                module: 'dividend',
+                label: '股息自由之路',
+                mode: 'single',
+                getSingle: function () { return state; },
+                setSingle: function (s) {
+                    state = s;
+                    saveStateToLocal();
+                    try {
+                        if (state.resolution) document.getElementById("user-motto").value = state.resolution;
+                        if (state.dailyCost) document.getElementById("daily-cost").value = state.dailyCost;
+                        switchAssetTab(state.activeAssetTab || "stock");
+                        calculateDividends();
+                    } catch (e) { }
+                }
             });
         }
     </script>

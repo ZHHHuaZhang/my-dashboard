@@ -9,6 +9,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/cloudbase-sdk.js"></script>
+<script src="assets/cloudbase-sync.js"></script>
 <style>
   * { -webkit-tap-highlight-color: transparent; }
   html, body { overscroll-behavior: none; }
@@ -1234,6 +1236,17 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('giteeModal').classList.contains('show')) closeGiteeSyncModal();
     else if (document.getElementById('itemModal').classList.contains('show')) closeModal();
   }
+});
+
+// ===================== CLOUDBASE 云同步 =====================
+CloudSync.attach({
+  module: 'items',
+  label: '物品管理',
+  mode: 'list',
+  getList: function () { return items; },
+  setList: function (arr) { items = arr; saveData(); },
+  idOf: function (it) { return it.id; },
+  onRemoteChange: function () { refreshAll(); }
 });
 </script>
 

@@ -1,0 +1,13 @@
+{
+  "envId": "mycloudbase-d2g3grx15f32df45e",
+  "functionRoot": "functions",
+  "functions": [
+    {
+      "name": "fundNavProxy",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256,
+      "timeout": 10
+    }
+  ]
+}

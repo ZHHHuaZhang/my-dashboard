@@ -91,6 +91,20 @@ jobs:
       - name: Deploy
         run: tcb hosting deploy dist -e mycloudbase-d2g3grx15f32df45e --verify --safe --prune --yes
 
+      # 云函数：场外基金净值代理（CORS 由云端完成，供智投精算看板调用）。
+      # 失败不阻断静态站点发布；需与 functions/fundNavProxy 目录保持一致。
+      - name: Deploy Cloud Function (fundNavProxy)
+        env:
+          CLOUDBASE_API_KEY: ${{ secrets.CLOUDBASE_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -d "functions/fundNavProxy" ]; then
+            tcb fn deploy fundNavProxy -e mycloudbase-d2g3grx15f32df45e --yes \
+              || echo "::warning::云函数 fundNavProxy 部署失败，不影响静态站点（可本地用 deploy.ps1 重试）"
+          else
+            echo "::warning::未找到 functions/fundNavProxy，跳过云函数部署"
+          fi
+
       - name: Summary
         if: always()
         run: |

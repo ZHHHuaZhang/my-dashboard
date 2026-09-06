@@ -51,4 +51,11 @@ if ($LASTEXITCODE -ne 0) { Write-Error '登录失败' }
 tcb hosting deploy dist -e $EnvId --verify --safe --prune --yes
 if ($LASTEXITCODE -ne 0) { Write-Error '部署失败（--safe 已尝试自动回滚）' }
 
+# 部署云函数（场外基金净值代理）。失败不阻断静态站点发布。
+if (Test-Path functions/fundNavProxy) {
+    tcb fn deploy fundNavProxy -e $EnvId --yes
+    if ($LASTEXITCODE -eq 0) { Write-Host '云函数 fundNavProxy 已部署' -ForegroundColor Green }
+    else { Write-Warning '云函数部署失败，请手动部署（不影响静态站点）' }
+}
+
 Write-Host '部署完成: https://mycloudbase-d2g3grx15f32df45e-1300750191.tcloudbaseapp.com/' -ForegroundColor Green

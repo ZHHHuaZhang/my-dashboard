@@ -649,6 +649,12 @@
         attach: attach,
         start: start,
         sync: function (m) { return m ? syncModule(m) : syncAll(); },
+        // 云端函数代理：供业务模块调用 CloudBase 云函数（如场外基金净值代理）。
+        // 复用本模块已初始化的 app 实例，无需业务代码自行 init。
+        callFunction: function (name, data) {
+            if (!initSdk()) throw new Error('cloudbase-sdk.js 未加载');
+            return app.callFunction({ name: name, data: data || {} });
+        },
         sendCode: sendCode,
         verifyCode: verifyCode,
         signOut: signOut,

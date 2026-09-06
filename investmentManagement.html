@@ -12,6 +12,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="assets/cloudbase-sdk.js"></script>
+    <script src="assets/cloudbase-sync.js"></script>
     <!-- Font Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -2537,6 +2539,22 @@ ${JSON.stringify(items.value.map(i => ({
             loadFromStorage();
             updateCharts();
             lucide.createIcons();
+
+            // ===================== CLOUDBASE 云同步 =====================
+            if (window.CloudSync) {
+                window.CloudSync.attach({
+                    module: 'portfolio',
+                    label: '智投精算',
+                    mode: 'list',
+                    getList: () => items.value,
+                    setList: (arr) => {
+                        items.value = arr;
+                        localStorage.setItem('portfolio_items_v2', JSON.stringify(arr));
+                    },
+                    idOf: (it) => it.id,
+                    onRemoteChange: () => { try { updateCharts(); } catch (e) { } }
+                });
+            }
         });
 
         return {

@@ -10,6 +10,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+    <script src="assets/cloudbase-sdk.js"></script>
+    <script src="assets/cloudbase-sync.js"></script>
     <script>
         setTimeout(function() {
             if (typeof Tesseract === 'undefined') {
@@ -2080,6 +2082,17 @@
         document.getElementById('record-modal').classList.remove('hidden');
         showToast('已填入，请确认后保存', 'info');
     }
+
+    // ===================== CLOUDBASE 云同步 =====================
+    CloudSync.attach({
+        module: 'ledger',
+        label: '日常记账',
+        mode: 'list',
+        getList: function () { return transactions; },
+        setList: function (arr) { transactions = arr; saveData(); },
+        idOf: function (t) { return t.id; },
+        onRemoteChange: function () { renderAll(); }
+    });
 </script>
 
 </body>

@@ -1,0 +1,81 @@
+name: Deploy
+
+# 触发方式：
+#   1. push 到主分支自动部署
+#   2. 手动触发：Actions 页 → Deploy → Run workflow（可选任意分支）
+#
+# GitHub Pages 由仓库设置里的「分支自动部署」负责，本 workflow 只管 CloudBase 静态托管。
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# 同一引用上排队执行，避免并发部署互相覆盖
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cloudbase-hosting:
+    name: Deploy to CloudBase Hosting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 只打包需要公开发布的文件，避免把源码/工具文件传到线上。
+      # 新增页面时必须在此登记，否则不会上线。
+      - name: Assemble dist
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/assets
+
+          PAGES="index.html dividend.html investmentManagement.html itemManagement.html ledgerWorkbench.html personalFinancesDashboard.html sunlightCompass.html"
+          for f in $PAGES; do
+            [ -f "$f" ] || { echo "::error::缺少页面文件 $f"; exit 1; }
+            cp "$f" dist/
+          done
+
+          for f in assets/cloudbase-sdk.js assets/cloudbase-sync.js; do
+            [ -f "$f" ] || { echo "::error::缺少脚本文件 $f"; exit 1; }
+            cp "$f" dist/assets/
+          done
+
+          echo "=== 本次部署清单 ==="
+          find dist -type f | sort
+          echo "文件数: $(find dist -type f | wc -l)"
+
+      - name: Install CloudBase CLI
+        run: npm install -g @cloudbase/cli@3.8.1
+
+      # 凭证通过环境变量注入，不直接出现在命令行里
+      - name: Login to CloudBase
+        env:
+          CLOUDBASE_APIKEY_ID: ${{ secrets.CLOUDBASE_APIKEY_ID }}
+          CLOUDBASE_APIKEY: ${{ secrets.CLOUDBASE_APIKEY }}
+        run: tcb login --apiKeyId "$CLOUDBASE_APIKEY_ID" --apiKey "$CLOUDBASE_APIKEY"
+
+      # --verify 校验远端与本地一致（大小+MD5）
+      # --safe   失败自动回滚到备份
+      # --prune  清理远端不属于本次发布的文件，保证云端与仓库完全对齐
+      - name: Deploy
+        run: tcb hosting deploy dist -e mycloudbase-d2g3grx15f32df45e --verify --safe --prune --yes
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 部署结果 ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
+            echo ""
+            echo "- 环境：\`mycloudbase\`"
+            echo "- Commit：\`${GITHUB_SHA::7}\`"
+            echo "- 分支：\`${GITHUB_REF_NAME}\`"
+            echo "- 站点：https://mycloudbase-d2g3grx15f32df45e-1300750191.tcloudbaseapp.com/"
+          } >> "$GITHUB_STEP_SUMMARY"

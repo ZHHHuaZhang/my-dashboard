@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/cloudbase-sdk.js"></script>
+    <script src="assets/cloudbase-sync.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -1761,6 +1763,17 @@
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
+
+        // ===================== CLOUDBASE 云同步 =====================
+        CloudSync.attach({
+            module: 'finance',
+            label: '资金统计',
+            mode: 'list',
+            getList: function () { return records; },
+            setList: function (arr) { records = arr; saveData(); },
+            idOf: function (r) { return r.id; },
+            onRemoteChange: function () { renderAll(); }
+        });
     </script>
 </body>
 </html>

@@ -55,12 +55,15 @@ jobs:
       - name: Install CloudBase CLI
         run: npm install -g @cloudbase/cli@3.8.1
 
-      # 凭证通过环境变量注入，不直接出现在命令行里
+      # 凭证通过环境变量注入，不直接出现在命令行里。
+      # 注意：--apiKeyId / --apiKey 接收的是【腾讯云 CAM 密钥】（访问管理 → API 密钥管理），
+      # 不是 CloudBase 控制台的 API Key —— 后者 api_key 类型平台尚未开放，传入会报
+      # "Tencent Cloud Key verification failed"。
       - name: Login to CloudBase
         env:
-          CLOUDBASE_APIKEY_ID: ${{ secrets.CLOUDBASE_APIKEY_ID }}
-          CLOUDBASE_APIKEY: ${{ secrets.CLOUDBASE_APIKEY }}
-        run: tcb login --apiKeyId "$CLOUDBASE_APIKEY_ID" --apiKey "$CLOUDBASE_APIKEY"
+          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
+          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
+        run: tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
 
       # --verify 校验远端与本地一致（大小+MD5）
       # --safe   失败自动回滚到备份

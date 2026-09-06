@@ -1778,146 +1778,205 @@ createApp({
             return code;
         };
 
+        // ---- 场内基金 / 股票：保持原有腾讯 qt.gtimg.cn 路径（完全不受影响）----
+        const fetchOnMarketPrices = async (onMarketItems) => {
+            // Separate fund and stock symbols
+            const fundSymbols = [];
+            const stockSymbols = [];
+            onMarketItems.forEach(item => {
+                let rawCode = (item.code || '').toString().trim();
+
+                // 如果用户在表单中输入了以 0 开头的场外基金，但被存为数字（导致前导 0 丢失），
+                // 则在明确标注为场外基金时把 5 位数补齐为 6 位（加前导0），例如 11966 -> 011966。
+                if (/^\d{5}$/.test(rawCode) && item.type === '场外基金') {
+                    rawCode = rawCode.padStart(6, '0');
+                    console.debug('Padded 5-digit code to 6-digit for off-market fund:', rawCode);
+                }
+
+                let symbol = getTencentSymbol(rawCode);
+
+                // 如果用户明确标注为场外基金，优先按场外基金处理
+                if (item.type === '场外基金') {
+                    symbol = 'fund_' + rawCode;
+                }
+
+                if (symbol && symbol.startsWith('fund_')) {
+                    fundSymbols.push({ symbol, item });
+                } else if (symbol) {
+                    stockSymbols.push({ symbol, item });
+                }
+            });
+
+            // Debug log: 显示将要请求的场外基金与股票代码，方便排查未包含的标的
+            console.debug('fetchOnMarketPrices - fundSymbols:', fundSymbols.map(f => f.symbol));
+            console.debug('fetchOnMarketPrices - stockSymbols:', stockSymbols.map(s => s.symbol));
+
+            // 额外收集所有可能的 6 位数候选（有些场外基金未标注为场外），优先尝试按场外基金查询
+            const potentialFundCandidates = [];
+            onMarketItems.forEach(item => {
+                const raw = (item.code || '').toString().trim();
+                if (/^\d{6}$/.test(raw)) {
+                    const fundSym = 'fund_' + raw;
+                    // 若尚未在 fundSymbols 中，且不是已明确股票类型，则作为候选场外基金
+                    if (!fundSymbols.some(f => f.symbol === fundSym) && item.type !== '股票') {
+                        potentialFundCandidates.push({ symbol: fundSym, item });
+                    }
+                }
+            });
+
+            // 合并已识别的场外基金与候选场外基金，先尝试通过场外基金渠道更新它们的净值
+            // 更新后重新构建股票请求列表（剔除已被当作场外基金处理的项）
+            const stockSymbolStrings = [...new Set(onMarketItems.map(item => getTencentSymbol((item.code || '').toString().trim())))]
+                .filter(sym => sym && !sym.startsWith('fund_'));
+            if (stockSymbolStrings.length === 0) {
+                return 0;
+            }
+            const url = `https://qt.gtimg.cn/q=${stockSymbolStrings.join(',')}`;
+
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('API请求失败');
+
+            const arrayBuffer = await response.arrayBuffer();
+            const decoder = new TextDecoder('gbk');
+            const text = decoder.decode(arrayBuffer);
+            const lines = text.split(';');
+
+            let updatedCount = 0;
+            const priceMap = {};
+
+            // Parse response and build price map
+            lines.forEach(line => {
+                if (!line.trim() || !line.includes('~')) return;
+                const match = line.match(/v_([a-zA-Z0-9_]+)=/);
+                if (!match) return;
+
+                const symbol = match[1].toLowerCase();
+                const parts = line.split('~');
+                if (parts.length < 4) return;
+
+                let price;
+                let name = parts[1] ? parts[1].trim() : '';
+                // 字段解析说明（基于腾讯 qt.gtimg.cn 实时接口，从0开始）：
+                //  [3] 当前价  [32] 涨跌幅%  [39] 市盈率TTM
+                // [44] 流通市值(亿) [45] 总市值(亿) [46] PB
+                // [64] ★ TTM股息率(%) —— 用它 × 当前价 ÷100 即可算出每股年度分红(元)
+                let dividendYieldTTM = NaN;
+                if (parts.length > 64) {
+                    const dy = parseFloat(parts[64]);
+                    if (!isNaN(dy) && dy >= 0 && dy < 100) dividendYieldTTM = dy;
+                }
+
+                // 场外基金的数据格式可能不同，尝试从多个位置获取价格
+                if (symbol.startsWith('fund_')) {
+                    price = parseFloat(parts[2]) || parseFloat(parts[3]) || parseFloat(parts[4]) ||
+                            parseFloat(parts[5]) || parseFloat(parts[6]) || parseFloat(parts[10]);
+                } else {
+                    price = parseFloat(parts[3]);
+                }
+
+                if (!isNaN(price) && price > 0) {
+                    priceMap[symbol] = {
+                        price,
+                        name,
+                        dividendYieldTTM: !isNaN(dividendYieldTTM) ? dividendYieldTTM : null
+                    };
+                }
+            });
+
+            // Update prices & 每股年度分红（从同一条腾讯接口记录派生，零额外请求）
+            onMarketItems.forEach(item => {
+                const symbol = getTencentSymbol(item.code);
+                const data = priceMap[symbol];
+                if (data) {
+                    item.latestPrice = Number(data.price.toFixed(4));
+                    if (data.name && (item.name === '' || item.name.includes('新建') || item.name.includes('未命名'))) {
+                        item.name = data.name;
+                    }
+                    if (item.type === '股票' && data.dividendYieldTTM != null && data.dividendYieldTTM > 0) {
+                        const perShare = data.dividendYieldTTM * data.price / 100;
+                        item.dividend = Number(perShare.toFixed(4));
+                    }
+                    updatedCount++;
+                }
+            });
+
+            return updatedCount;
+        };
+
+        // ---- 场外基金：通过 CloudBase 云函数代理获取净值（跨域 CORS 由云端完成）----
+        // 浏览器无法直接跨域请求天天基金/东方财富的净值接口，因此交由云端函数代理。
+        // 该路径与上方场内路径完全独立、互不干扰；不走腾讯接口，故不影响场内更新。
+        const fetchOffMarketFundPrices = async (offMarketItems) => {
+            // 去重：同一基金代码只查一次
+            const seen = new Set();
+            const codes = [];
+            offMarketItems.forEach(item => {
+                let raw = (item.code || '').toString().trim();
+                if (/^\d{5}$/.test(raw)) raw = raw.padStart(6, '0'); // 5位补齐为6位场外基金代码
+                if (!raw) return;
+                if (!seen.has(raw)) { seen.add(raw); codes.push(raw); }
+            });
+            if (codes.length === 0) return 0;
+
+            if (!window.CloudSync || typeof window.CloudSync.callFunction !== 'function') {
+                throw new Error('云同步未就绪（CloudSync.callFunction 不可用）');
+            }
+
+            const res = await window.CloudSync.callFunction('fundNavProxy', { codes });
+            if (!res || res.error) {
+                throw new Error((res && res.error && (res.error.message || res.error)) || '云函数返回异常');
+            }
+            const payload = (res.data || res.result) || {};
+            if (payload.error === 'unauthorized') {
+                throw new Error(payload.message || '请先登录后再刷新场外基金净值');
+            }
+            const navMap = payload.data || {};
+
+            let updatedCount = 0;
+            offMarketItems.forEach(item => {
+                let raw = (item.code || '').toString().trim();
+                if (/^\d{5}$/.test(raw)) raw = raw.padStart(6, '0');
+                const info = navMap[raw];
+                const nav = info && info.nav;
+                if (nav && !isNaN(nav) && nav > 0) {
+                    item.latestPrice = Number(Number(nav).toFixed(4));
+                    if (info.name && (item.name === '' || item.name.includes('新建') || item.name.includes('未命名'))) {
+                        item.name = info.name;
+                    }
+                    updatedCount++;
+                }
+            });
+            if (updatedCount > 0) console.debug(`成功更新 ${updatedCount} 个场外基金净值（云函数代理）`);
+            return updatedCount;
+        };
+
+        // 一键刷新：场内/股票走腾讯接口，场外基金走云端代理，两条路径互不干扰
         const fetchLatestPrices = async () => {
             isRefreshing.value = true;
             try {
-                // Filter items that need price update (holding status with valid code)
-                const holdingItems = items.value.filter(item => item.code && item.type !== '场外基金');
-
-
-                if (holdingItems.length === 0) {
-                    saveToStorage();
-                    updateCharts();
-                    return;
-                }
-
-                // Separate fund and stock symbols
-                const fundSymbols = [];
-                const stockSymbols = [];
-                holdingItems.forEach(item => {
-                    let rawCode = (item.code || '').toString().trim();
-
-                    // 如果用户在表单中输入了以 0 开头的场外基金，但被存为数字（导致前导 0 丢失），
-                    // 则在明确标注为场外基金时把 5 位数补齐为 6 位（加前导0），例如 11966 -> 011966。
-                    if (/^\d{5}$/.test(rawCode) && item.type === '场外基金') {
-                        rawCode = rawCode.padStart(6, '0');
-                        console.debug('Padded 5-digit code to 6-digit for off-market fund:', rawCode);
-                    }
-
-                    let symbol = getTencentSymbol(rawCode);
-
-                    // 如果用户明确标注为场外基金，优先按场外基金处理
-                    if (item.type === '场外基金') {
-                        symbol = 'fund_' + rawCode;
-                    }
-
-                    if (symbol && symbol.startsWith('fund_')) {
-                        fundSymbols.push({ symbol, item });
-                    } else if (symbol) {
-                        stockSymbols.push({ symbol, item });
-                    }
-                });
-
-                // Debug log: 显示将要请求的场外基金与股票代码，方便排查未包含的标的
-                console.debug('fetchLatestPrices - fundSymbols:', fundSymbols.map(f => f.symbol));
-                console.debug('fetchLatestPrices - stockSymbols:', stockSymbols.map(s => s.symbol));
-
-                // 额外收集所有可能的 6 位数候选（有些场外基金未标注为场外），优先尝试按场外基金查询
-                const potentialFundCandidates = [];
-                holdingItems.forEach(item => {
-                    const raw = (item.code || '').toString().trim();
-                    if (/^\d{6}$/.test(raw)) {
-                        const fundSym = 'fund_' + raw;
-                        // 若尚未在 fundSymbols 中，且不是已明确股票类型，则作为候选场外基金
-                        if (!fundSymbols.some(f => f.symbol === fundSym) && item.type !== '股票') {
-                            potentialFundCandidates.push({ symbol: fundSym, item });
-                        }
-                    }
-                });
-
-                // 合并已识别的场外基金与候选场外基金，先尝试通过场外基金渠道更新它们的净值
-                // 更新后重新构建股票请求列表（剔除已被当作场外基金处理的项）
-                const stockSymbolStrings = [...new Set(holdingItems.map(item => getTencentSymbol((item.code || '').toString().trim())))]
-                    .filter(sym => sym && !sym.startsWith('fund_'));
-                if (stockSymbolStrings.length === 0) {
-                    saveToStorage();
-                    updateCharts();
-                    return;
-                }
-                const url = `https://qt.gtimg.cn/q=${stockSymbolStrings.join(',')}`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('API请求失败');
-
-                const arrayBuffer = await response.arrayBuffer();
-                const decoder = new TextDecoder('gbk');
-                const text = decoder.decode(arrayBuffer);
-                const lines = text.split(';');
-
                 let updatedCount = 0;
-                const priceMap = {};
+                const errors = [];
 
-                // Parse response and build price map
-                lines.forEach(line => {
-                    if (!line.trim() || !line.includes('~')) return;
-                    const match = line.match(/v_([a-zA-Z0-9_]+)=/);
-                    if (!match) return;
-                    
-                    const symbol = match[1].toLowerCase();
-                    const parts = line.split('~');
-                    if (parts.length < 4) return;
-                    
-                    let price;
-                    let name = parts[1] ? parts[1].trim() : '';
-                    // 字段解析说明（基于腾讯 qt.gtimg.cn 实时接口，从0开始）：
-                    //  [3] 当前价  [32] 涨跌幅%  [39] 市盈率TTM
-                    // [44] 流通市值(亿) [45] 总市值(亿) [46] PB
-                    // [64] ★ TTM股息率(%) —— 用它 × 当前价 ÷100 即可算出每股年度分红(元)
-                    let dividendYieldTTM = NaN;
-                    if (parts.length > 64) {
-                        const dy = parseFloat(parts[64]);
-                        if (!isNaN(dy) && dy >= 0 && dy < 100) dividendYieldTTM = dy;
-                    }
+                // 1) 场内基金 / 股票：原有路径，完全不变
+                const onMarketItems = items.value.filter(item => item.code && item.type !== '场外基金');
+                if (onMarketItems.length > 0) {
+                    try { updatedCount += await fetchOnMarketPrices(onMarketItems); }
+                    catch (e) { errors.push('场内/股票：' + (e.message || e)); }
+                }
 
-                    // 场外基金的数据格式可能不同，尝试从多个位置获取价格
-                    if (symbol.startsWith('fund_')) {
-                        price = parseFloat(parts[2]) || parseFloat(parts[3]) || parseFloat(parts[4]) || 
-                                parseFloat(parts[5]) || parseFloat(parts[6]) || parseFloat(parts[10]);
-                    } else {
-                        price = parseFloat(parts[3]);
-                    }
-                    
-                    if (!isNaN(price) && price > 0) {
-                        priceMap[symbol] = {
-                            price,
-                            name,
-                            dividendYieldTTM: !isNaN(dividendYieldTTM) ? dividendYieldTTM : null
-                        };
-                    }
-                });
-
-                // Update prices & 每股年度分红（从同一条腾讯接口记录派生，零额外请求）
-                holdingItems.forEach(item => {
-                    const symbol = getTencentSymbol(item.code);
-                    const data = priceMap[symbol];
-                    if (data) {
-                        item.latestPrice = Number(data.price.toFixed(4));
-                        if (data.name && (item.name === '' || item.name.includes('新建') || item.name.includes('未命名'))) {
-                            item.name = data.name;
-                        }
-                        if (item.type === '股票' && data.dividendYieldTTM != null && data.dividendYieldTTM > 0) {
-                            const perShare = data.dividendYieldTTM * data.price / 100;
-                            item.dividend = Number(perShare.toFixed(4));
-                        }
-                        updatedCount++;
-                    }
-                });
+                // 2) 场外基金：云端函数代理（不影响场内）
+                const offMarketItems = items.value.filter(item => item.code && item.type === '场外基金');
+                if (offMarketItems.length > 0) {
+                    try { updatedCount += await fetchOffMarketFundPrices(offMarketItems); }
+                    catch (e) { errors.push('场外基金：' + (e.message || e)); }
+                }
 
                 saveToStorage();
                 updateCharts();
-                
-                if (updatedCount > 0) {
-                    console.debug(`成功更新 ${updatedCount} 个标的的最新价格！`);
+
+                if (updatedCount > 0) console.debug(`成功更新 ${updatedCount} 个标的的最新价格！`);
+                if (errors.length) {
+                    console.error('部分价格更新失败：', errors.join('；'));
                 }
             } catch (error) {
                 console.error('获取价格失败:', error);

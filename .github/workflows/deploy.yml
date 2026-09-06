@@ -59,11 +59,31 @@ jobs:
       # 注意：--apiKeyId / --apiKey 接收的是【腾讯云 CAM 密钥】（访问管理 → API 密钥管理），
       # 不是 CloudBase 控制台的 API Key —— 后者 api_key 类型平台尚未开放，传入会报
       # "Tencent Cloud Key verification failed"。
+      # 先确认 Secret 真的传进来了。未配置时 ${{ secrets.X }} 会展开成空字符串，
+      # 导致 CLI 拿着空值去校验，报的却是"密钥错误"，极难定位。
+      - name: Verify secret
+        env:
+          CLOUDBASE_API_KEY: ${{ secrets.CLOUDBASE_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDBASE_API_KEY:-}" ]; then
+            echo "::error::CLOUDBASE_API_KEY 未设置或为空"
+            echo "请到 Settings → Secrets and variables → Actions 检查名称是否完全一致（区分大小写）"
+            exit 1
+          fi
+          echo "长度: ${#CLOUDBASE_API_KEY}"
+          case "$CLOUDBASE_API_KEY" in
+            eyJ*) echo "格式正确（JWT）" ;;
+            *) echo "::warning::不以 eyJ 开头，请确认填的是 CloudBase 环境级 API Key" ;;
+          esac
+
+      # 用 CloudBase 环境级 API Key 登录：
+      #   权限被限定在本环境内，比账号级 CAM 密钥安全得多，且只需 1 个 Secret。
+      # 注意参数必须是 --cloudbase-api-key，不是 --apiKeyId/--apiKey（那组是给 CAM 密钥用的）。
       - name: Login to CloudBase
         env:
-          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
-          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
-        run: tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
+          CLOUDBASE_API_KEY: ${{ secrets.CLOUDBASE_API_KEY }}
+        run: tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" -e mycloudbase-d2g3grx15f32df45e
 
       # --verify 校验远端与本地一致（大小+MD5）
       # --safe   失败自动回滚到备份

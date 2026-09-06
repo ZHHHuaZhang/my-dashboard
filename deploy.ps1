@@ -4,8 +4,8 @@
 #   npm install -g @cloudbase/cli
 #
 # 用法：
-#   $env:CLOUDBASE_APIKEY_ID = "你的 keyId"
-#   $env:CLOUDBASE_APIKEY    = "你的 apiKey"
+#   $env:TCB_SECRET_ID  = "你的腾讯云 SecretId"
+#   $env:TCB_SECRET_KEY = "你的腾讯云 SecretKey"
 #   .\deploy.ps1
 #
 # 注意：api_key 属服务端凭证，不要写进本文件或提交到仓库。
@@ -24,8 +24,8 @@ $Pages = @(
 )
 $Scripts = @('assets/cloudbase-sdk.js', 'assets/cloudbase-sync.js')
 
-if (-not $env:CLOUDBASE_APIKEY_ID -or -not $env:CLOUDBASE_APIKEY) {
-    Write-Error '请先设置环境变量 CLOUDBASE_APIKEY_ID 与 CLOUDBASE_APIKEY'
+if (-not $env:TCB_SECRET_ID -or -not $env:TCB_SECRET_KEY) {
+    Write-Error '请先设置环境变量 TCB_SECRET_ID 与 TCB_SECRET_KEY（腾讯云 CAM 密钥，见 .env.example）'
 }
 
 # 组装 dist
@@ -46,7 +46,7 @@ Get-ChildItem -Recurse -File dist | ForEach-Object { Write-Host ('  ' + $_.FullN
 Write-Host ('文件数: ' + (Get-ChildItem -Recurse -File dist).Count) -ForegroundColor Cyan
 
 # 登录并部署
-tcb login --apiKeyId $env:CLOUDBASE_APIKEY_ID --apiKey $env:CLOUDBASE_APIKEY
+tcb login --apiKeyId $env:TCB_SECRET_ID --apiKey $env:TCB_SECRET_KEY
 if ($LASTEXITCODE -ne 0) { Write-Error '登录失败' }
 
 tcb hosting deploy dist -e $EnvId --verify --safe --prune --yes

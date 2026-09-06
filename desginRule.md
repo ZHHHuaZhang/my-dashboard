@@ -81,13 +81,25 @@ assets/cloudbase-sdk.js  assets/cloudbase-sync.js
 
 #### 凭证
 
-Actions 使用 `api_key`（服务端权限），存于仓库
+Actions 使用**腾讯云 CAM 密钥**，存于仓库
 **Settings → Secrets and variables → Actions**：
 
-- `CLOUDBASE_APIKEY_ID`
-- `CLOUDBASE_APIKEY`
+- `TCB_SECRET_ID` — 腾讯云 SecretId（`AKID...` 开头）
+- `TCB_SECRET_KEY` — 腾讯云 SecretKey
 
-⚠️ 该凭证为 `service_role` 且具系统管理员权限，**任何情况下都不得写入代码或日志**。
+获取：腾讯云控制台 → **访问管理 → API 密钥管理** → 新建密钥。
+
+> ⚠️ 常见误区：`tcb login --apiKeyId/--apiKey` 传的是上述 CAM 密钥，
+> **不是** CloudBase 控制台「环境 → API Key 管理」里创建的密钥。
+> CloudBase 的 `api_key`（服务端）类型平台尚未开放，传入会报
+> `Tencent Cloud Key verification failed`。
+
+⚠️ CAM 密钥可操作账号下全部云资源，务必：
+
+- 在 CAM 里新建**子用户**并仅授予 CloudBase 相关权限，不要用主账号密钥
+- 任何情况下不得写入代码或日志
+- 定期轮换
+
 本地应急部署用 `deploy.ps1`，凭证通过环境变量注入（见 `.env.example`）。
 
 #### 其他

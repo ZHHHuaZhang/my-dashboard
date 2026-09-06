@@ -81,24 +81,32 @@ assets/cloudbase-sdk.js  assets/cloudbase-sync.js
 
 #### 凭证
 
-Actions 使用**腾讯云 CAM 密钥**，存于仓库
+Actions 使用 **CloudBase 环境级 API Key**，存于仓库
 **Settings → Secrets and variables → Actions**：
 
-- `TCB_SECRET_ID` — 腾讯云 SecretId（`AKID...` 开头）
-- `TCB_SECRET_KEY` — 腾讯云 SecretKey
+- `CLOUDBASE_API_KEY` — CloudBase 环境级 API Key（JWT，`eyJ...` 开头）
 
-获取：腾讯云控制台 → **访问管理 → API 密钥管理** → 新建密钥。
+创建：控制台「环境 → API Key 管理」，或 `tcb env apikey create <name> -e <envId>`。
+令牌明文**只在创建时返回一次**。
 
-> ⚠️ 常见误区：`tcb login --apiKeyId/--apiKey` 传的是上述 CAM 密钥，
-> **不是** CloudBase 控制台「环境 → API Key 管理」里创建的密钥。
-> CloudBase 的 `api_key`（服务端）类型平台尚未开放，传入会报
-> `Tencent Cloud Key verification failed`。
+登录命令：
 
-⚠️ CAM 密钥可操作账号下全部云资源，务必：
+```bash
+tcb login --cloudbase-api-key <key> -e <envId>
+```
 
-- 在 CAM 里新建**子用户**并仅授予 CloudBase 相关权限，不要用主账号密钥
-- 任何情况下不得写入代码或日志
-- 定期轮换
+> ⚠️ **参数别写错**——CLI 有两组登录参数，混用会报
+> `Tencent Cloud Key verification failed`：
+>
+> | 凭证 | 参数 |
+> |---|---|
+> | CloudBase 环境级 API Key | `--cloudbase-api-key <key> -e <envId>` |
+> | 腾讯云 CAM 密钥（SecretId/SecretKey） | `--apiKeyId <secretId> --apiKey <secretKey>` |
+>
+> 优先用前者：权限被限定在单个环境内，泄露影响面远小于账号级 CAM 密钥，
+> 也免去配置 CAM 子用户和策略。
+
+⚠️ 该凭证具 `service_role` 权限（可绕过 RLS），**不得写入代码或日志**，定期轮换。
 
 本地应急部署用 `deploy.ps1`，凭证通过环境变量注入（见 `.env.example`）。
 

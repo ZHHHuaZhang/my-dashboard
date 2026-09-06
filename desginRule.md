@@ -23,7 +23,7 @@ CloudSync.attach({
 });
 ```
 
-Currently registered: `ledger`(日常记账)、`finance`(资金统计)、`items`(物品管理)、`portfolio`(智投精算)、`dividend`(股息自由之路, single)。
+Currently registered: `ledger`(日常记账)、`finance`(资金统计)、`items`(物品管理)、`portfolio`(智投精算)、`dividend`(股息自由之路, single)、`ledgerCats`(记账分类, single, 收入/支出分类与账户标签)。
 `module` key is written into the database; renaming it orphans existing cloud data.
 
 ### Rules

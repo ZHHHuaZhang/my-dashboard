@@ -2093,6 +2093,31 @@
         idOf: function (t) { return t.id; },
         onRemoteChange: function () { renderAll(); }
     });
+
+    // 分类（收入/支出）与账户标签作为整体对象同步，避免"分类标签不自动同步"的问题。
+    CloudSync.attach({
+        module: 'ledgerCats',
+        label: '记账分类',
+        mode: 'single',
+        getSingle: function () {
+            return { income: categories.income, expense: categories.expense, accounts: accounts || [] };
+        },
+        setSingle: function (obj) {
+            if (obj) {
+                if (obj.income && obj.income.length) categories.income = obj.income;
+                if (obj.expense && obj.expense.length) categories.expense = obj.expense;
+                if (obj.accounts) accounts = obj.accounts;
+            }
+            saveData();
+        },
+        onRemoteChange: function () {
+            updateCategoryDropdowns();
+            updateFilterDropdowns();
+            populateCategoryLists();
+            populateAccountsList();
+            renderAll();
+        }
+    });
 </script>
 
 </body>

@@ -934,6 +934,8 @@ window.editItem = function(id) {
 
 window.deleteItem = function(id) {
   if (!confirm('确定要删除这个物品记录吗？')) return;
+  // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+  if (window.CloudSync) window.CloudSync.markDeleted('items', id);
   items = items.filter(function(i) { return i.id !== id; });
   saveData();
   refreshAll();
@@ -1010,6 +1012,9 @@ function importData(file) {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data)) throw new Error('格式错误');
       if (confirm('导入 ' + data.length + ' 条记录？\n确定将覆盖现有数据。')) {
+        // 全量覆盖：先登记被替换掉的记录为显式删除，避免旧数据残留在云端后被"复活"
+        // 触发批量删除保护且用户取消时，中止导入，云端记录保持不变
+        if (window.CloudSync && window.CloudSync.markReplaced('items', data.map(function (d) { return d.id; })) === false) return;
         items = data;
         saveData();
         refreshAll();
@@ -1109,10 +1114,17 @@ async function uploadToGitee() {
   giteeConfig = cfg;
   saveData();
 
+  // 上传前先同步一次云端最新，避免用本地旧数据盖掉云端已有备份
+  try { if (window.CloudSync) await window.CloudSync.sync('items'); } catch (e) { }
+
   setGiteeButtons(true);
   setGiteeStatus('正在同步备份到 Gitee 云端...', 'info');
   try {
-    const contentStr = JSON.stringify({ items: items }, null, 2);
+    // 备份文件带上版本与时间戳，便于跨版本兼容与回滚时判断新旧
+    const contentStr = JSON.stringify(
+      Object.assign({ items: items },
+        window.CloudSync ? window.CloudSync.backupStamp('items') : {}),
+      null, 2);
     const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, function(m, p1) {
       return String.fromCharCode('0x' + p1);
     }));
@@ -1171,12 +1183,17 @@ async function downloadFromGitee() {
       const cloudData = JSON.parse(decodedStr);
 
       if (cloudData.items && Array.isArray(cloudData.items)) {
-        items = cloudData.items;
+        // 合并恢复：本地独有的记录保留，避免"恢复即丢数据"
+        items = (window.CloudSync && window.CloudSync.mergeExternal)
+          ? window.CloudSync.mergeExternal('items', cloudData.items)
+          : cloudData.items;
+        // 重置增量位点，下次同步做全量重拉，与云端重新对齐
+        if (window.CloudSync) window.CloudSync.resetSince('items');
         saveData();
         renderCategoryOptions();
         refreshAll();
         setGiteeStatus('数据恢复成功！', 'success');
-        showToast('已从云端恢复 ' + items.length + ' 条记录', 'success');
+        showToast('已合并云端备份，当前共 ' + items.length + ' 条记录', 'success');
       } else {
         setGiteeStatus('云端数据格式异常', 'error');
       }

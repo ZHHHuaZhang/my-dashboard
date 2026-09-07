@@ -6,7 +6,21 @@
       "name": "fundNavProxy",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
-      "memorySize": 256,
+      "memorySize": 128,
+      "timeout": 10
+    },
+    {
+      "name": "probeAuth",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 128,
+      "timeout": 10
+    },
+    {
+      "name": "serverTime",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 128,
       "timeout": 10
     }
   ]

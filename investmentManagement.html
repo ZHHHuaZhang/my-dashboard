@@ -1745,6 +1745,8 @@ createApp({
 
         const confirmDelete = () => {
             if (itemToDelete.value) {
+                // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+                if (window.CloudSync) window.CloudSync.markDeleted('portfolio', itemToDelete.value.id);
                 items.value = items.value.filter(i => i.id !== itemToDelete.value.id);
                 saveToStorage();
                 updateCharts();
@@ -1753,6 +1755,8 @@ createApp({
         };
 
         const deleteItem = (id) => {
+            // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+            if (window.CloudSync) window.CloudSync.markDeleted('portfolio', id);
             items.value = items.value.filter(i => i.id !== id);
             saveToStorage();
             updateCharts();
@@ -1927,9 +1931,6 @@ createApp({
                 throw new Error((res && res.error && (res.error.message || res.error)) || '云函数返回异常');
             }
             const payload = (res.data || res.result) || {};
-            if (payload.error === 'unauthorized') {
-                throw new Error(payload.message || '请先登录后再刷新场外基金净值');
-            }
             const navMap = payload.data || {};
 
             let updatedCount = 0;
@@ -2415,6 +2416,8 @@ ${JSON.stringify(items.value.map(i => ({
             }
 
             giteeSyncing.value = true;
+            // 上传前先同步一次云端最新，避免用本地旧数据盖掉云端已有备份
+            try { if (window.CloudSync) await window.CloudSync.sync('portfolio'); } catch (e) { }
             setGiteeStatus('正在同步备份到Gitee云端...', 'info');
 
             try {
@@ -2476,7 +2479,12 @@ ${JSON.stringify(items.value.map(i => ({
                     
                     const cloudData = JSON.parse(decodedStr);
                     if (Array.isArray(cloudData)) {
-                        items.value = cloudData;
+                        // 合并恢复：本地独有的记录保留，避免"恢复即丢数据"
+                        items.value = (window.CloudSync && window.CloudSync.mergeExternal)
+                            ? window.CloudSync.mergeExternal('portfolio', cloudData)
+                            : cloudData;
+                        // 重置增量位点，下次同步做全量重拉，与云端重新对齐
+                        if (window.CloudSync) window.CloudSync.resetSince('portfolio');
                         saveToStorage();
                         updateCharts();
                         setGiteeStatus('数据恢复成功！', 'success');

@@ -1199,6 +1199,8 @@
 
     function deleteTransaction(id) {
         if (!confirm('确定删除该笔交易？')) return;
+        // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+        if (window.CloudSync) window.CloudSync.markDeleted('ledger', id);
         transactions = transactions.filter(t => t.id !== id);
         saveData();
         renderAll();
@@ -1561,7 +1563,11 @@
             { type:'expense', amount:220, category:'entertainment', account:'wechat', date:`${y}-${String(m+1).padStart(2,'0')}-25`, time:'20:00', note:'健身房月卡' },
             { type:'expense', amount:76, category:'food', account:'alipay', date:`${y}-${String(m+1).padStart(2,'0')}-26`, time:'13:00', note:'外卖午餐' }
         ];
-        transactions = samples.map((s, i) => ({ ...s, id: 'tx-sample-' + i }));
+        // 示例数据同样走合并，避免载入演示数据清掉真实记账
+        const sampleTx = samples.map((s, i) => ({ ...s, id: 'tx-sample-' + i }));
+        transactions = (window.CloudSync && window.CloudSync.mergeExternal)
+            ? window.CloudSync.mergeExternal('ledger', sampleTx)
+            : sampleTx;
         saveData();
         renderAll();
         if (showToast) showToast('演示数据已载入', 'success');
@@ -1588,6 +1594,9 @@
                 const data = JSON.parse(ev.target.result);
                 if (data.transactions && Array.isArray(data.transactions)) {
                     if (!confirm(`将导入 ${data.transactions.length} 条记录，是否覆盖当前数据？`)) return;
+                    // 全量覆盖：先登记被替换掉的记录为显式删除，避免旧数据残留在云端后被"复活"
+                    // 触发批量删除保护且用户取消时，中止导入，云端记录保持不变
+                    if (window.CloudSync && window.CloudSync.markReplaced('ledger', data.transactions.map(t => t.id)) === false) return;
                     transactions = data.transactions;
                     if (data.categories) categories = { ...DEFAULT_CATEGORIES, ...data.categories };
                     if (data.accounts) accounts = data.accounts;
@@ -1671,11 +1680,14 @@
         if (!token || !user || !repo) { setGiteeStatus('请填写完整的 Gitee 配置信息！', 'warning'); return; }
         giteeConfig = { token, user, repo };
         saveData();
+        // 上传前先同步一次云端最新，避免用本地旧数据盖掉云端已有备份
+        try { if (window.CloudSync) await window.CloudSync.sync('ledger'); } catch (e) { }
         setGiteeButtons(true);
         setGiteeStatus('正在同步备份到 Gitee 云端...', 'info');
         try {
             const path = 'ledger_workbench_data.json';
-            const payload = { transactions, categories, accounts };
+            const payload = Object.assign({ transactions, categories, accounts },
+                window.CloudSync ? window.CloudSync.backupStamp('ledger') : {});
             const contentStr = JSON.stringify(payload, null, 2);
             const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1)));
             const fileInfo = await getGiteeFileInfo(token, user, repo, path);
@@ -1717,7 +1729,12 @@
                 const decodedStr = decodeURIComponent(Array.prototype.map.call(rawBin, c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
                 const cloudData = JSON.parse(decodedStr);
                 if (cloudData.transactions && Array.isArray(cloudData.transactions)) {
-                    transactions = cloudData.transactions;
+                    // 合并恢复：本地独有的记录保留，避免"恢复即丢数据"
+                    transactions = (window.CloudSync && window.CloudSync.mergeExternal)
+                        ? window.CloudSync.mergeExternal('ledger', cloudData.transactions)
+                        : cloudData.transactions;
+                    // 重置增量位点，下次同步做全量重拉，与云端重新对齐
+                    if (window.CloudSync) window.CloudSync.resetSince('ledger');
                     if (cloudData.categories) categories = { ...DEFAULT_CATEGORIES, ...cloudData.categories };
                     if (cloudData.accounts) accounts = cloudData.accounts;
                     saveData();

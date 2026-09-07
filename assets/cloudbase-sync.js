@@ -28,7 +28,10 @@
         maxDailyCalls: 200,      // 每日网络请求熔断上限（约 2 点/天），防止异常循环烧穿额度
         batchSize: 500,          // 单批 upsert 条数
         tombstoneTTL: 90 * 24 * 3600 * 1000,
-        singleId: '__singleton__'
+        singleId: '__singleton__',
+        deleteGuardCount: 10,    // 单次删除达到该条数需二次确认（防批量误删）
+        deleteGuardRatio: 0.5,   // 或达到存量该比例需二次确认（防全量误删）
+        backupVersion: 2         // 外部备份文件格式版本（Gitee / 导出 JSON）
     };
 
     var SINGLE = CONFIG.singleId;
@@ -175,30 +178,109 @@
         var ad = adapters[m];
         if (!ad || ad.mode === 'single') return 0;
 
-        var keep = {};
-        (keepIds || []).forEach(function (id) { keep[String(id)] = true; });
+        var keep = {}, validKeep = 0;
+        (keepIds || []).forEach(function (id) {
+            var k = String(id);
+            if (!k || k === 'undefined' || k === 'null') return;
+            keep[k] = true; validKeep++;
+        });
 
         var items;
         try { items = currentItems(ad); } catch (e) { return 0; }
 
-        // 一次性写入，避免逐条 markDeleted 造成大量 localStorage 写操作
-        var pending = loadPendingDeletes(m);
-        var t = now(), count = 0;
+        // 先算出待删清单，过完保护再落盘，避免保护未生效就已经写进队列
+        var toDelete = [];
         for (var i = 0; i < items.length; i++) {
             var id = items[i].id;
             if (!id || id === 'undefined' || id === 'null') continue;
             if (keep[id]) continue;
-            pending[id] = { ts: t, data: items[i].value };
-            count++;
+            toDelete.push({ id: id, data: items[i].value });
         }
+        var count = toDelete.length;
         if (!count) return 0;
 
+        // ---- 批量删除保护（熔断）----
+        var total = items.length;
+        var noValidKeep = validKeep === 0;
+        var overCount = count >= CONFIG.deleteGuardCount;
+        var overRatio = count >= total * CONFIG.deleteGuardRatio;
+        if (noValidKeep || overCount || overRatio) {
+            var tip = noValidKeep
+                ? '新数据中没有有效 id，本次覆盖会把全部 ' + count + ' 条云端记录标记为删除。确定继续吗？\n（选"取消"将只覆盖本地，云端记录保持不变）'
+                : '本次覆盖会把 ' + count + ' 条云端记录标记为删除（当前共 ' + total + ' 条）。确定继续吗？';
+            if (typeof global.confirm === 'function' && !global.confirm(tip)) {
+                console.warn('[CloudSync] 已取消批量删除，云端记录保持不变');
+                return false;   // 业务代码应据此中止覆盖
+            }
+        }
+
+        // 一次性写入，避免逐条 markDeleted 造成大量 localStorage 写操作
+        var pending = loadPendingDeletes(m);
+        var t = now();
+        for (var j = 0; j < toDelete.length; j++) {
+            pending[toDelete[j].id] = { ts: t, data: toDelete[j].data };
+        }
         savePendingDeletes(m, pending);
         if (session) {
             clearTimeout(pushTimers[m]);
             pushTimers[m] = setTimeout(function () { syncModule(m); }, CONFIG.pushDelay);
         }
         return count;
+    }
+
+    // ---------- 外部数据合并（备份恢复 / 示例数据）----------
+    // 全量覆盖是数据丢失的主要来源：用一份较旧的备份覆盖本地后，因为增量位点 since 只增不减，
+    // 被覆盖掉的记录既不在本地、又因 updated_at < since 永远拉不回来，表现为"永久丢失"。
+    // 这里改为按 id 合并：本地独有的保留、双方都有则取较新的一方、备份独有的补进来。
+    function toNum(v) {
+        var n = Number(v);
+        return (v === undefined || v === null || v === '' || isNaN(n)) ? null : n;
+    }
+
+    function mergeExternal(m, incoming) {
+        if (!Array.isArray(incoming)) return incoming;
+        var ad = adapters[m];
+        if (!ad || ad.mode === 'single') return incoming;
+
+        var local = [];
+        try { local = (ad.getList && ad.getList()) || []; } catch (e) { local = []; }
+
+        var byId = {}, order = [];
+        local.forEach(function (it) {
+            var id = String(ad.idOf(it));
+            if (!id || id === 'undefined' || id === 'null') return;
+            byId[id] = it; order.push(id);
+        });
+
+        var added = 0, updated = 0;
+        incoming.forEach(function (it) {
+            var id = String(ad.idOf(it));
+            if (!id || id === 'undefined' || id === 'null') return;
+            if (!Object.prototype.hasOwnProperty.call(byId, id)) {
+                byId[id] = it; order.push(id); added++; return;
+            }
+            // 冲突取 updated_at 较大的一方；只有一方有时取有的；都没有则保留本地
+            var ta = toNum(byId[id] && byId[id].updated_at);
+            var tb = toNum(it && it.updated_at);
+            if (tb !== null && (ta === null || tb > ta)) { byId[id] = it; updated++; }
+        });
+
+        var out = order.map(function (id) { return byId[id]; });
+        console.info('[CloudSync] 合并外部数据（' + m + '）：新增 ' + added +
+            ' 条，更新 ' + updated + ' 条，保留本地 ' + (out.length - added - updated) + ' 条');
+        return out;
+    }
+
+    // 外部数据落地后重置增量位点，让下次同步做一次全量重拉，与云端重新对齐
+    function resetSince(m) { setSince(m, 0); }
+
+    // 外部备份文件的统一元信息，便于跨版本兼容与回滚时判断新旧
+    function backupStamp(m) {
+        return {
+            version: CONFIG.backupVersion,
+            exportedAt: new Date().toISOString(),
+            module: m || ''
+        };
     }
 
     // ---------- 服务端时钟基准 ----------
@@ -973,6 +1055,9 @@
         markReplaced: markReplaced,
         listDeleted: listDeleted,
         restoreDeleted: restoreDeleted,
+        mergeExternal: mergeExternal,
+        resetSince: resetSince,
+        backupStamp: backupStamp,
         serverNow: serverNow,
         start: start,
         sync: function (m) { return m ? syncModule(m) : syncAll(); },

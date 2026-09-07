@@ -2416,6 +2416,8 @@ ${JSON.stringify(items.value.map(i => ({
             }
 
             giteeSyncing.value = true;
+            // 上传前先同步一次云端最新，避免用本地旧数据盖掉云端已有备份
+            try { if (window.CloudSync) await window.CloudSync.sync('portfolio'); } catch (e) { }
             setGiteeStatus('正在同步备份到Gitee云端...', 'info');
 
             try {
@@ -2477,7 +2479,12 @@ ${JSON.stringify(items.value.map(i => ({
                     
                     const cloudData = JSON.parse(decodedStr);
                     if (Array.isArray(cloudData)) {
-                        items.value = cloudData;
+                        // 合并恢复：本地独有的记录保留，避免"恢复即丢数据"
+                        items.value = (window.CloudSync && window.CloudSync.mergeExternal)
+                            ? window.CloudSync.mergeExternal('portfolio', cloudData)
+                            : cloudData;
+                        // 重置增量位点，下次同步做全量重拉，与云端重新对齐
+                        if (window.CloudSync) window.CloudSync.resetSince('portfolio');
                         saveToStorage();
                         updateCharts();
                         setGiteeStatus('数据恢复成功！', 'success');

@@ -761,12 +761,16 @@
             giteeConfig = { token, user, repo };
             saveData();
 
+            // 上传前先同步一次云端最新，避免用本地旧数据盖掉云端已有备份
+            try { if (window.CloudSync) await window.CloudSync.sync('finance'); } catch (e) { }
+
             setGiteeButtons(true);
             setGiteeStatus('正在同步备份到Gitee云端...', 'info');
 
             try {
                 const path = 'fund_tracker_data.json';
-                const payload = { records };
+                const payload = Object.assign({ records },
+                    window.CloudSync ? window.CloudSync.backupStamp('finance') : {});
                 const contentStr = JSON.stringify(payload, null, 2);
                 const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
 
@@ -829,7 +833,12 @@
                     
                     const cloudData = JSON.parse(decodedStr);
                     if (cloudData.records && Array.isArray(cloudData.records)) {
-                        records = cloudData.records;
+                        // 合并恢复：本地独有的记录保留，避免"恢复即丢数据"
+                        records = (window.CloudSync && window.CloudSync.mergeExternal)
+                            ? window.CloudSync.mergeExternal('finance', cloudData.records)
+                            : cloudData.records;
+                        // 重置增量位点，下次同步做全量重拉，与云端重新对齐
+                        if (window.CloudSync) window.CloudSync.resetSince('finance');
                         saveData();
                         renderAll();
                         setGiteeStatus('数据恢复成功！', 'success');
@@ -848,13 +857,17 @@
         }
 
         function loadSampleData(showToast = true) {
-            records = [
+            const sampleRecords = [
                 { id: '1', date: '2025-06-30', cash: 15000, cashItems: [{id:'c1',name:'工商银行活期',amount:8000},{id:'c2',name:'现金',amount:7000}], liquid: 30000, liquidItems: [{id:'l1',name:'余额宝',amount:18000},{id:'l2',name:'微信零钱通',amount:12000}], stable: 80000, stableItems: [{id:'s1',name:'招商银行定期',amount:50000},{id:'s2',name:'国债',amount:30000}], growth: 50000, growthItems: [{id:'g1',name:'沪深300ETF',amount:30000},{id:'g2',name:'创业板ETF',amount:20000}], dividend: 25000, dividendItems: [{id:'d1',name:'中证红利ETF',amount:15000},{id:'d2',name:'银行股',amount:10000}], liability: 8000, liabilityItems: [{id:'lb1',name:'招商银行信用卡',amount:5000},{id:'lb2',name:'花呗',amount:3000}], note: '2025年中资金结余盘点' },
                 { id: '2', date: '2025-09-30', cash: 18000, cashItems: [{id:'c3',name:'工商银行活期',amount:10000},{id:'c4',name:'现金',amount:8000}], liquid: 32000, liquidItems: [{id:'l3',name:'余额宝',amount:20000},{id:'l4',name:'招招宝',amount:12000}], stable: 85000, stableItems: [{id:'s3',name:'定期存款',amount:55000},{id:'s4',name:'债券基金',amount:30000}], growth: 58000, growthItems: [{id:'g3',name:'沪深300ETF',amount:35000},{id:'g4',name:'纳指ETF',amount:23000}], dividend: 28000, dividendItems: [{id:'d3',name:'中证红利ETF',amount:18000},{id:'d4',name:'REITs',amount:10000}], liability: 12000, liabilityItems: [{id:'lb3',name:'招商银行信用卡',amount:8000},{id:'lb4',name:'美团月付',amount:4000}], note: '三季度固收与红利追加' },
                 { id: '3', date: '2025-12-31', cash: 22000, cashItems: [{id:'c5',name:'工商银行活期',amount:12000},{id:'c6',name:'现金',amount:10000}], liquid: 35000, liquidItems: [{id:'l5',name:'余额宝',amount:22000},{id:'l6',name:'招招宝',amount:13000}], stable: 92000, stableItems: [{id:'s5',name:'定期存款',amount:60000},{id:'s6',name:'债券基金',amount:32000}], growth: 62000, growthItems: [{id:'g5',name:'沪深300ETF',amount:38000},{id:'g6',name:'纳指ETF',amount:24000}], dividend: 32000, dividendItems: [{id:'d5',name:'中证红利ETF',amount:20000},{id:'d6',name:'银行股',amount:12000}], liability: 5000, liabilityItems: [{id:'lb5',name:'花呗',amount:5000}], note: '年终盘点与奖金划拨' },
                 { id: '4', date: '2026-03-31', cash: 20000, cashItems: [{id:'c7',name:'工商银行活期',amount:11000},{id:'c8',name:'现金',amount:9000}], liquid: 38000, liquidItems: [{id:'l7',name:'余额宝',amount:24000},{id:'l8',name:'招招宝',amount:14000}], stable: 100000, stableItems: [{id:'s7',name:'定期存款',amount:65000},{id:'s8',name:'债券基金',amount:35000}], growth: 70000, growthItems: [{id:'g7',name:'沪深300ETF',amount:42000},{id:'g8',name:'创业板ETF',amount:28000}], dividend: 38000, dividendItems: [{id:'d7',name:'中证红利ETF',amount:23000},{id:'d8',name:'REITs',amount:15000}], liability: 15000, liabilityItems: [{id:'lb7',name:'招商银行信用卡',amount:10000},{id:'lb8',name:'花呗',amount:5000}], note: '一季度逢低定投股票基金' },
                 { id: '5', date: '2026-06-30', cash: 25000, cashItems: [{id:'c9',name:'工商银行活期',amount:14000},{id:'c10',name:'现金',amount:11000}], liquid: 40000, liquidItems: [{id:'l9',name:'余额宝',amount:25000},{id:'l10',name:'招招宝',amount:15000}], stable: 110000, stableItems: [{id:'s9',name:'定期存款',amount:70000},{id:'s10',name:'债券基金',amount:40000}], growth: 78000, growthItems: [{id:'g9',name:'沪深300ETF',amount:46000},{id:'g10',name:'纳指ETF',amount:32000}], dividend: 45000, dividendItems: [{id:'d9',name:'中证红利ETF',amount:27000},{id:'d10',name:'银行股',amount:18000}], liability: 10000, liabilityItems: [{id:'lb9',name:'招商银行信用卡',amount:7000},{id:'lb10',name:'美团月付',amount:3000}], note: '年中复盘：红利资产分红再投资' }
             ];
+            // 示例数据同样走合并，避免载入演示数据清掉真实记录
+            records = (window.CloudSync && window.CloudSync.mergeExternal)
+                ? window.CloudSync.mergeExternal('finance', sampleRecords)
+                : sampleRecords;
             records.sort((a, b) => new Date(a.date) - new Date(b.date));
             saveData();
             renderAll();
@@ -1729,7 +1742,8 @@
                     const parsed = JSON.parse(evt.target.result);
                     if (parsed.records && Array.isArray(parsed.records)) {
                         // 全量覆盖：先登记被替换掉的记录为显式删除，避免旧数据残留在云端后被"复活"
-                        if (window.CloudSync) window.CloudSync.markReplaced('finance', parsed.records.map(r => r.id));
+                        // 触发批量删除保护且用户取消时，中止导入，云端记录保持不变
+                        if (window.CloudSync && window.CloudSync.markReplaced('finance', parsed.records.map(r => r.id)) === false) return;
                         records = parsed.records;
                         saveData();
                         renderAll();

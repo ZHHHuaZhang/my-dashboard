@@ -3,6 +3,7 @@
 All moudlue must follow the design rule.
 Every moudlue's tab is in the top of the page and has gittee synchronization funtion. Moudlue should intergare with the main page index.html.
 This porject is deployed on CloudBase static hosting (data sync requires the hosting domain, which is in the CloudBase 安全域名白名单). The GitHub Pages copy remains as a public demo without cloud sync.
+The delete opreation must be careful. Must not to allow bath delte operation.
 
 ## Cloud Sync (CloudBase)
 

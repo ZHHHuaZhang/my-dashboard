@@ -1199,6 +1199,8 @@
 
     function deleteTransaction(id) {
         if (!confirm('确定删除该笔交易？')) return;
+        // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+        if (window.CloudSync) window.CloudSync.markDeleted('ledger', id);
         transactions = transactions.filter(t => t.id !== id);
         saveData();
         renderAll();
@@ -1588,6 +1590,8 @@
                 const data = JSON.parse(ev.target.result);
                 if (data.transactions && Array.isArray(data.transactions)) {
                     if (!confirm(`将导入 ${data.transactions.length} 条记录，是否覆盖当前数据？`)) return;
+                    // 全量覆盖：先登记被替换掉的记录为显式删除，避免旧数据残留在云端后被"复活"
+                    if (window.CloudSync) window.CloudSync.markReplaced('ledger', data.transactions.map(t => t.id));
                     transactions = data.transactions;
                     if (data.categories) categories = { ...DEFAULT_CATEGORIES, ...data.categories };
                     if (data.accounts) accounts = data.accounts;

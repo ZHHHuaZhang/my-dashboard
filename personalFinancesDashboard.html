@@ -1696,6 +1696,8 @@
 
         function deleteRecord(id) {
             if (!confirm('确定要删除这条资金记录快照吗？')) return;
+            // 先登记显式删除：此时记录仍在列表中，可自动抓取原始数据写入墓碑，便于误删恢复
+            if (window.CloudSync) window.CloudSync.markDeleted('finance', id);
             records = records.filter(r => r.id !== id);
             saveData();
             renderAll();
@@ -1726,6 +1728,8 @@
                 try {
                     const parsed = JSON.parse(evt.target.result);
                     if (parsed.records && Array.isArray(parsed.records)) {
+                        // 全量覆盖：先登记被替换掉的记录为显式删除，避免旧数据残留在云端后被"复活"
+                        if (window.CloudSync) window.CloudSync.markReplaced('finance', parsed.records.map(r => r.id));
                         records = parsed.records;
                         saveData();
                         renderAll();

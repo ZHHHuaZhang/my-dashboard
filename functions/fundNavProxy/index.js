@@ -5,11 +5,12 @@
 // 入参：{ codes: ["000001", "011966", ...] }  （也可经 HTTP 触发器传 JSON body）
 // 出参：{ success: true, data: { "000001": { code, name, nav, date }, ... }, count }
 //
-// 安全/防刷设计（匿名公开调用前提下的必要防护）：
+// 安全/防刷设计：
+//   0) 登录鉴权：由云函数「安全规则」在平台层完成（invoke: "auth != null"，仅登录用户可调用）。
+//      Web SDK 的 callFunction 不会把 userInfo 注入 event，故不在代码里判断登录态。
 //   1) 入参强校验：仅接受 6 位数字基金代码，单次上限 50 个，杜绝垃圾/枚举滥用。
 //   2) 净值缓存：净值每日仅更新一次，命中缓存直接返回，不再打上游，刷爆基本失效。
 //   3) 实例级限流：单实例每分钟上限，超出返回 429；配合控制台「最大实例数」硬封顶。
-//   4) 可选来源白名单：仅当配置了 ALLOW_ORIGIN 且请求带 Origin 时才校验（HTTP 触发场景）。
 const https = require('https');
 
 // ---- 防护配置（可按需调整）----
@@ -18,10 +19,6 @@ const CACHE_TTL_MS = 60 * 60 * 1000;        // 净值缓存 1 小时（每日仅
 const FAIL_CACHE_TTL_MS = 5 * 60 * 1000;    // 失败结果短缓存，避免坏代码反复打上游
 const RATE_WINDOW_MS = 60 * 1000;           // 限流窗口 1 分钟
 const RATE_MAX = 60;                        // 每实例每分钟最多处理请求数
-const ALLOW_ORIGIN = (process.env.ALLOW_ORIGIN || '')
-    .split(',').map((s) => s.trim()).filter(Boolean);
-// 是否要求登录态（页面已有邮箱验证码登录）。设为 false 可临时关闭鉴权用于排查。
-const REQUIRE_LOGIN = (process.env.REQUIRE_LOGIN || 'true') !== 'false';
 
 // 模块级状态：在同一实例的多次调用间复用（冷启动除外）
 const cache = new Map();                    // code -> { ts, value, ok }
@@ -155,35 +152,10 @@ function extractCodes(event) {
     return [];
 }
 
-function getOrigin(event) {
-    const h = (event && (event.headers || {})) || {};
-    return h.origin || h.Origin || h.referer || h.Referer || '';
-}
-
 exports.main = async (event, context) => {
-    // 可选来源白名单（仅 HTTP 触发且配置了 ALLOW_ORIGIN 时生效；SDK callFunction 不带 Origin，跳过）
-    if (ALLOW_ORIGIN.length) {
-        const origin = getOrigin(event);
-        if (origin && !ALLOW_ORIGIN.some((o) => origin === o || origin.startsWith(o))) {
-            return { success: false, error: 'forbidden' };
-        }
-    }
-
-    // 鉴权：仅允许已登录用户（页面为邮箱验证码登录，SDK callFunction 会注入登录态）。
-    // Web SDK 登录用户：event.userInfo 含 uid / openId / appId / customUserId。
-    if (REQUIRE_LOGIN) {
-        const ui = (event && event.userInfo) || (context && context.userInfo) || {};
-        const hasIdentity = !!(ui.uid || ui.openId || ui.openid || ui.customUserId || ui.appId);
-        if (!hasIdentity) {
-            return {
-                success: false,
-                error: 'unauthorized',
-                message: '请先登录后再刷新场外基金净值',
-                // 调试信息：用于确认已登录用户是否确实带上了 userInfo（不含任何敏感值）
-                debug: { hasUserInfo: !!((event && event.userInfo) || (context && context.userInfo)), keys: Object.keys(ui) }
-            };
-        }
-    }
+    // 鉴权说明：登录校验已由云函数「安全规则」在平台层完成
+    // （invoke: "auth != null"，仅登录用户可调用）。Web SDK 的 callFunction
+    // 不会把 userInfo 注入 event，故不在代码里做身份判断，避免误拒。
 
     // 实例级限流
     if (isRateLimited()) {

@@ -61,6 +61,7 @@
     // ---------- 误删恢复面板状态 ----------
     var uiDeleted = null;       // null = 未打开恢复面板；数组 = 已加载的墓碑列表
     var uiDeletedBusy = false;
+    var uiRemote = null;        // null = 未打开待确认删除面板；数组 = 远端墓碑待确认列表
 
     // ---------- 基础工具 ----------
     function now() { return Date.now(); }
@@ -129,6 +130,114 @@
             if (!obj || !Object.keys(obj).length) localStorage.removeItem(delKey(m));
             else localStorage.setItem(delKey(m), JSON.stringify(obj));
         } catch (e) { }
+    }
+
+    // ---------- 远端删除待确认队列 ----------
+    // 删除的"发起"是手动的，但"传播"曾经是自动的：一个设备删除后，其他设备拉取到墓碑
+    // 会直接 splice 本地数组，用户完全不知情。这违反 fail-safe——程序出错时应当停在
+    // "没同步上"，而不是"数据被销毁"。故远端墓碑一律不自动生效，先登记待确认。
+    function rdelKey(m) { return '__cbsync_rdel_' + m; }
+
+    function loadRemoteDeletes(m) {
+        try {
+            var o = JSON.parse(localStorage.getItem(rdelKey(m)) || '{}');
+            return (o && typeof o === 'object') ? o : {};
+        } catch (e) { return {}; }
+    }
+
+    function saveRemoteDeletes(m, obj) {
+        try {
+            if (!obj || !Object.keys(obj).length) localStorage.removeItem(rdelKey(m));
+            else localStorage.setItem(rdelKey(m), JSON.stringify(obj));
+        } catch (e) { }
+    }
+
+    // 拉取到远端墓碑时登记，绝不在此处删除本地数据
+    function recordRemoteDelete(m, id, row) {
+        var pending = loadRemoteDeletes(m);
+        pending[String(id)] = {
+            ts: Date.now(),
+            updated_at: row.updated_at,
+            data: row.data || {}
+        };
+        saveRemoteDeletes(m, pending);
+        emitStatus();
+    }
+
+    function countRemoteDeletes() {
+        var n = 0;
+        moduleOrder.forEach(function (m) { n += Object.keys(loadRemoteDeletes(m)).length; });
+        return n;
+    }
+
+    function buildRemoteList() {
+        var out = [];
+        moduleOrder.forEach(function (m) {
+            var p = loadRemoteDeletes(m);
+            Object.keys(p).forEach(function (id) {
+                out.push({
+                    module: m,
+                    label: (adapters[m] && adapters[m].label) || m,
+                    rec_id: id,
+                    data: p[id].data
+                });
+            });
+        });
+        return out;
+    }
+
+    // 用户确认后才在本机执行删除，并回写墓碑保持各端一致
+    function confirmRemoteDeletes(m, ids) {
+        var ad = adapters[m];
+        if (!ad || ad.mode === 'single') return 0;
+
+        var pending = loadRemoteDeletes(m);
+        var target = (ids && ids.length) ? ids.map(String) : Object.keys(pending);
+        var arr = [];
+        try { arr = ad.getList() || []; } catch (e) { arr = []; }
+
+        var n = 0;
+        target.forEach(function (id) {
+            if (!pending[id]) return;
+            for (var i = arr.length - 1; i >= 0; i--) {
+                if (String(ad.idOf(arr[i])) === id) { arr.splice(i, 1); break; }
+            }
+            markDeleted(m, id, pending[id].data);   // 回写墓碑，保持各端一致
+            delete pending[id];
+            n++;
+        });
+
+        if (n) {
+            saveRemoteDeletes(m, pending);
+            try { if (ad.setList) ad.setList(arr); } catch (e) { }
+            try { if (ad.onRemoteChange) ad.onRemoteChange(); } catch (e) { }
+            if (session) {
+                clearTimeout(pushTimers[m]);
+                pushTimers[m] = setTimeout(function () { syncModule(m); }, CONFIG.pushDelay);
+            }
+            emitStatus();
+        }
+        return n;
+    }
+
+    // 用户选择保留：丢弃这条待确认，本机数据不动（云端仍是墓碑，可在误删恢复里找回）
+    function keepRemoteDelete(m, id) {
+        var pending = loadRemoteDeletes(m);
+        if (!pending[String(id)]) return false;
+        delete pending[String(id)];
+        saveRemoteDeletes(m, pending);
+        emitStatus();
+        return true;
+    }
+
+    // 本地数组中定位记录下标，不存在返回 -1
+    function localIndexOf(ad, id) {
+        var arr;
+        try { arr = (ad.getList && ad.getList()) || []; } catch (e) { return -1; }
+        for (var i = 0; i < arr.length; i++) {
+            if (String(ad.idOf(arr[i])) === id) return i;
+        }
+        return -1;
     }
 
     /**
@@ -330,6 +439,7 @@
             online: online,
             lastSyncAt: lastSyncAt,
             lastError: lastError ? String(lastError.message || lastError) : null,
+            pendingRemoteDeletes: countRemoteDeletes(),
             modules: moduleOrder.slice()
         };
     }
@@ -523,14 +633,13 @@
             ad._pending = row.data;
             return true;
         }
+        // 重要：这里绝不能再依据 row.deleted 删除本地记录。
+        // 远端墓碑一律先登记为待确认（recordRemoteDelete），由用户在同步面板确认后才生效；
+        // 否则一个设备上的误删会自动、静默地扩散到所有设备，既无提示也无法回溯。
         var arr = ad.getList();
         var idx = -1, i;
         for (i = 0; i < arr.length; i++) {
             if (String(ad.idOf(arr[i])) === id) { idx = i; break; }
-        }
-        if (row.deleted) {
-            if (idx >= 0) { arr.splice(idx, 1); return true; }
-            return false;
         }
         if (idx >= 0) {
             if (hashStr(stableStringify(arr[idx])) === hashStr(stableStringify(row.data))) return false;
@@ -572,11 +681,21 @@
             var id = String(row.rec_id);
             if (row.updated_at > maxU) maxU = row.updated_at;
             var m = meta[id];
+
+            if (row.deleted) {
+                // 远端删除不自动生效：
+                // 1) 本机此前已删过 -> 仅推进墓碑时间
+                // 2) 本机仍存在该记录 -> 登记待确认，交用户决定
+                //    （此处不写 meta 墓碑，否则本地记录会被反向判为"新数据"重新推活）
+                if (m && m.d) meta[id] = { u: row.updated_at, d: true };
+                else if (localIndexOf(ad, id) >= 0) recordRemoteDelete(ad.module, id, row);
+                count++;
+                return;
+            }
+
             // LWW：远端更新则采纳（本地未同步的更新 updated_at 更大，会在 push 时胜出）
             if (!m || row.updated_at > (m.u || 0)) {
-                meta[id] = row.deleted
-                    ? { u: row.updated_at, d: true }
-                    : { u: row.updated_at, d: false, h: hashStr(stableStringify(row.data)) };
+                meta[id] = { u: row.updated_at, d: false, h: hashStr(stableStringify(row.data)) };
                 if (applyRemote(ad, id, row)) dirty = true;
             }
             count++;
@@ -739,7 +858,7 @@
     async function signOut() {
         try { if (auth) await auth.signOut(); } catch (e) { }
         session = null; userEmail = '';
-        uiDeleted = null; uiDeletedBusy = false;
+        uiDeleted = null; uiDeletedBusy = false; uiRemote = null;
         emitStatus(); renderUI();
     }
 
@@ -862,6 +981,25 @@
                     '<button class="link" id="__cbsync_back">换个邮箱</button>' +
                     '<div id="__cbsync_msg"></div>';
             }
+        } else if (uiRemote) {
+            html += '<h4>待确认删除</h4>' +
+                '<div id="__cbsync_msg"></div>';
+            if (!uiRemote.length) {
+                html += '<div class="__cbsync_hint">没有待确认的删除</div>';
+            } else {
+                html += '<div class="__cbsync_hint">以下记录已在其他设备删除。本机是否同步删除？</div>';
+                html += '<div class="__cbsync_list">';
+                uiRemote.forEach(function (it, idx) {
+                    html += '<div class="__cbsync_item">' +
+                        '<div class="__cbsync_item_m">' + escapeHtml(it.label) + '</div>' +
+                        '<div class="__cbsync_item_t">' + escapeHtml(summarizeData(it.data)) + '</div>' +
+                        '<button class="link" data-rdel-del="' + idx + '">删除</button>' +
+                        '<button class="link" data-rdel-keep="' + idx + '">保留</button>' +
+                        '</div>';
+                });
+                html += '</div>';
+            }
+            html += '<button class="link" id="__cbsync_back_list">返回</button>';
         } else if (uiDeleted) {
             html += '<h4>误删恢复</h4>' +
                 '<div id="__cbsync_msg"></div>';
@@ -882,9 +1020,13 @@
             }
             html += '<button class="link" id="__cbsync_back_list">返回</button>';
         } else {
+            var rdelN = countRemoteDeletes();
             html += '<h4>云同步</h4>' +
                 '<div id="__cbsync_msg"></div>' +
                 '<button id="__cbsync_now">立即同步</button>' +
+                (rdelN > 0
+                    ? '<button class="link" id="__cbsync_rdel">待确认删除（' + rdelN + '）</button>'
+                    : '') +
                 '<button class="link" id="__cbsync_restore">误删恢复</button>' +
                 '<button class="link" id="__cbsync_out">退出登录（保留本地数据）</button>' +
                 '<div id="__cbsync_stat"></div>';
@@ -984,7 +1126,38 @@
         };
 
         const btnBackList = document.getElementById('__cbsync_back_list');
-        if (btnBackList) btnBackList.onclick = function () { uiDeleted = null; renderPanel(); };
+        if (btnBackList) btnBackList.onclick = function () { uiDeleted = null; uiRemote = null; renderPanel(); };
+
+        const btnRdel = document.getElementById('__cbsync_rdel');
+        if (btnRdel) btnRdel.onclick = function () {
+            uiRemote = buildRemoteList();
+            renderPanel();
+        };
+
+        // 远端删除由用户逐条决定"删除"还是"保留"，绝不自动生效
+        var rdelDelBtns = uiPanel ? uiPanel.querySelectorAll('[data-rdel-del]') : [];
+        Array.prototype.forEach.call(rdelDelBtns, function (btn) {
+            btn.onclick = function () {
+                var it = uiRemote[parseInt(btn.getAttribute('data-rdel-del'), 10)];
+                if (!it) return;
+                confirmRemoteDeletes(it.module, [it.rec_id]);
+                uiRemote = buildRemoteList();
+                renderPanel();
+                msg('已在本机删除', 'ok');
+            };
+        });
+
+        var rdelKeepBtns = uiPanel ? uiPanel.querySelectorAll('[data-rdel-keep]') : [];
+        Array.prototype.forEach.call(rdelKeepBtns, function (btn) {
+            btn.onclick = function () {
+                var it = uiRemote[parseInt(btn.getAttribute('data-rdel-keep'), 10)];
+                if (!it) return;
+                keepRemoteDelete(it.module, it.rec_id);
+                uiRemote = buildRemoteList();
+                renderPanel();
+                msg('已保留，本机不会删除', 'ok');
+            };
+        });
 
         // 逐条恢复：用 module+rec_id 定位，不能依赖下标（列表会变化）
         var restoreBtns = uiPanel ? uiPanel.querySelectorAll('[data-restore]') : [];
@@ -1019,6 +1192,7 @@
             lines.push('上次同步：' + d.toLocaleTimeString('zh-CN', { hour12: false }));
         }
         if (s.lastError) lines.push('错误：' + s.lastError);
+        if (s.pendingRemoteDeletes) lines.push('待确认删除：' + s.pendingRemoteDeletes + ' 条');
         if (s.modules.length) lines.push('模块：' + s.modules.map(function (m) {
             return (adapters[m] && adapters[m].label) || m;
         }).join('、'));
@@ -1055,6 +1229,9 @@
         markReplaced: markReplaced,
         listDeleted: listDeleted,
         restoreDeleted: restoreDeleted,
+        confirmRemoteDeletes: confirmRemoteDeletes,
+        keepRemoteDelete: keepRemoteDelete,
+        countRemoteDeletes: countRemoteDeletes,
         mergeExternal: mergeExternal,
         resetSince: resetSince,
         backupStamp: backupStamp,

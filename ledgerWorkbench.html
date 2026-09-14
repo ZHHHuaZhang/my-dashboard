@@ -288,6 +288,33 @@
                 </div>
             </div>
 
+            <!-- 每月固定预算 -->
+            <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">本月预算</h3>
+                        <p class="text-[11px] text-slate-500">固定月度花销上限，可随时调整</p>
+                    </div>
+                    <i class="fa-solid fa-wallet text-emerald-500"></i>
+                </div>
+                <div class="flex items-center gap-2 mb-3">
+                    <label class="text-xs text-slate-500 shrink-0">月度预算</label>
+                    <div class="flex items-center border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:bg-white">
+                        <span class="text-sm text-slate-400 mr-0.5">￥</span>
+                        <input id="budget-input" type="number" min="0" step="100" inputmode="decimal" placeholder="未设置"
+                               class="w-28 bg-transparent text-sm font-semibold text-slate-800 outline-none" oninput="onBudgetInput()">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="text-slate-500">已花 <span id="budget-spent" class="font-semibold text-slate-700">￥0.00</span></span>
+                    <span class="text-slate-500">剩余 <span id="budget-remaining" class="font-semibold">未设置</span></span>
+                </div>
+                <div class="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div id="budget-bar" class="h-full rounded-full bg-teal-400 transition-all" style="width:0%"></div>
+                </div>
+                <p id="budget-hint" class="text-[11px] text-slate-400 mt-1.5"></p>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
@@ -419,6 +446,51 @@
                         </select>
                     </div>
                 </div>
+            </div>
+
+            <!-- 每日花费日历看板 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">每日花费日历</h3>
+                        <p class="text-xs text-slate-500">以月份为维度，查看每一天的花销热力</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="calendarPrevMonth()" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="calendar-month-label" class="text-sm font-semibold text-slate-800 w-24 text-center"></span>
+                        <button type="button" onclick="calendarNextMonth()" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition"><i class="fa-solid fa-chevron-right"></i></button>
+                        <select id="calendar-type" onchange="renderCalendar()" class="text-xs border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-emerald-500 p-2">
+                            <option value="expense">支出</option>
+                            <option value="income">收入</option>
+                            <option value="net">净额</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-7 gap-1.5 text-center text-[11px] text-slate-400 mb-1.5 font-medium">
+                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-1.5"></div>
+                <div class="flex items-center justify-end gap-1.5 mt-3 text-[11px] text-slate-400">
+                    <span>少</span>
+                    <span class="w-4 h-4 rounded bg-slate-100"></span>
+                    <span class="w-4 h-4 rounded bg-teal-100"></span>
+                    <span class="w-4 h-4 rounded bg-teal-300"></span>
+                    <span class="w-4 h-4 rounded bg-teal-500"></span>
+                    <span class="w-4 h-4 rounded bg-teal-700"></span>
+                    <span>多</span>
+                </div>
+            </div>
+
+            <!-- 每周花费看板 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-1">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">每周花费</h3>
+                        <p class="text-xs text-slate-500">按周一至周日拆分，统计每周花销（与上方日历共用同一月份）</p>
+                    </div>
+                </div>
+                <div id="weekly-summary" class="text-xs text-slate-500 mb-3"></div>
+                <div id="weekly-list" class="space-y-2.5"></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -820,6 +892,7 @@
 
     let currentRecordType = 'expense';
     let editingTxId = null;
+    let monthlyBudget = 0;   // 每月固定花销预算（可在总览页调整）
 
     let trendChartInstance = null;
     let expenseDoughnutInstance = null;
@@ -828,6 +901,7 @@
 
     window.onload = function() {
         loadStoredData();
+        loadMonthlyBudget();
         if (transactions.length === 0) {
             loadSampleData(false);
         }
@@ -1104,6 +1178,8 @@
         if (tabId === 'reports') {
             updateFilterDropdowns();
             renderReports();
+            renderCalendar();
+            renderWeekly();
         } else if (tabId === 'records') {
             updateFilterDropdowns();
             renderRecordsTable();
@@ -1114,7 +1190,8 @@
 
     function setRecordType(type) {
         currentRecordType = type;
-        editingTxId = null;
+        // 注意：不要在此处重置 editingTxId，否则 openRecordModal 在 setRecordType 之前
+        // 设置的 editingTxId 会被覆盖，导致编辑时变成新增记录（原始记录残留 → 变成两条）。
         const btnExp = document.getElementById('btn-type-expense');
         const btnInc = document.getElementById('btn-type-income');
         const btnTra = document.getElementById('btn-type-transfer');
@@ -1226,6 +1303,7 @@
         document.getElementById('overview-month-expense-count').innerText = curMonthTx.filter(t=>t.type==='expense').length + ' 笔交易';
         document.getElementById('overview-month-saving-rate').innerText = '储蓄率 ' + savingRate.toFixed(1) + '%';
 
+        renderBudget();
         renderTrendChart();
         renderExpenseDoughnut(curMonth);
 
@@ -1270,6 +1348,74 @@
                     </div>
                 </div>`;
             }).join('');
+        }
+    }
+
+    // ===================== 每月预算 =====================
+    function loadMonthlyBudget() {
+        try {
+            const v = parseFloat(localStorage.getItem('__ledger_monthly_budget'));
+            monthlyBudget = (isNaN(v) || v < 0) ? 0 : v;
+        } catch (e) { monthlyBudget = 0; }
+    }
+
+    function saveMonthlyBudget() {
+        try { localStorage.setItem('__ledger_monthly_budget', String(monthlyBudget)); } catch (e) { }
+    }
+
+    function onBudgetInput() {
+        const el = document.getElementById('budget-input');
+        if (!el) return;
+        const v = parseFloat(el.value);
+        monthlyBudget = (isNaN(v) || v < 0) ? 0 : v;
+        saveMonthlyBudget();
+        renderBudget();
+    }
+
+    function renderBudget() {
+        const input = document.getElementById('budget-input');
+        if (input && document.activeElement !== input) {
+            input.value = monthlyBudget > 0 ? monthlyBudget : '';
+        }
+        const spentEl = document.getElementById('budget-spent');
+        const remEl = document.getElementById('budget-remaining');
+        const barEl = document.getElementById('budget-bar');
+        const hintEl = document.getElementById('budget-hint');
+        if (!spentEl) return;
+
+        const now = new Date();
+        const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const spent = (transactions || []).filter(t => getMonthKey(t.date) === curMonth && t.type === 'expense')
+            .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+        spentEl.innerText = formatCurrency(spent);
+
+        if (monthlyBudget <= 0) {
+            remEl.innerText = '未设置';
+            remEl.className = 'font-semibold text-slate-400';
+            barEl.style.width = '0%';
+            barEl.className = 'h-full rounded-full bg-teal-400 transition-all';
+            if (hintEl) hintEl.innerText = '在上方输入月度预算，即可实时查看剩余额度';
+            return;
+        }
+
+        const remaining = monthlyBudget - spent;
+        const ratio = spent / monthlyBudget;
+        remEl.innerText = formatCurrency(remaining);
+        barEl.style.width = Math.min(100, ratio * 100) + '%';
+
+        if (remaining < 0) {
+            remEl.className = 'font-semibold text-orange-600';
+            barEl.className = 'h-full rounded-full bg-orange-500 transition-all';
+            if (hintEl) hintEl.innerText = `已超预算 ${formatCurrency(-remaining)}（${ (ratio * 100).toFixed(0) }%）`;
+        } else if (ratio >= 0.8) {
+            remEl.className = 'font-semibold text-amber-500';
+            barEl.className = 'h-full rounded-full bg-amber-400 transition-all';
+            if (hintEl) hintEl.innerText = `已用 ${ (ratio * 100).toFixed(0) }%，接近上限，还可花 ${formatCurrency(remaining)}`;
+        } else {
+            remEl.className = 'font-semibold text-emerald-600';
+            barEl.className = 'h-full rounded-full bg-teal-400 transition-all';
+            if (hintEl) hintEl.innerText = `已用 ${ (ratio * 100).toFixed(0) }%，还可花 ${formatCurrency(remaining)}`;
         }
     }
 
@@ -1532,10 +1678,164 @@
         document.getElementById('report-summary').innerText = `合计 ${formatCurrency(total)} / ${entries.reduce((s,e)=>s+e.count,0)} 笔`;
     }
 
+    // ===================== 每日花费日历 =====================
+    let calendarView = null;   // { y, m } 当前查看的年月（m: 0-11）
+
+    function renderCalendar() {
+        if (!calendarView) {
+            const now = new Date();
+            calendarView = { y: now.getFullYear(), m: now.getMonth() };
+        }
+        const y = calendarView.y, m = calendarView.m;
+        const label = document.getElementById('calendar-month-label');
+        if (label) label.textContent = `${y}年${m + 1}月`;
+
+        const typeSel = document.getElementById('calendar-type');
+        const type = typeSel ? typeSel.value : 'expense';
+        const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+        // 聚合当月每日金额
+        const daily = {};   // date -> { expense, income, count }
+        (transactions || []).forEach(t => {
+            if (!t || !t.date || getMonthKey(t.date) !== monthKey) return;
+            if (!daily[t.date]) daily[t.date] = { expense: 0, income: 0, count: 0 };
+            const amt = Number(t.amount) || 0;
+            if (t.type === 'expense') daily[t.date].expense += amt;
+            else if (t.type === 'income') daily[t.date].income += amt;
+            daily[t.date].count++;
+        });
+
+        const valueOf = (d) => type === 'income' ? d.income
+            : type === 'net' ? d.income - d.expense : d.expense;
+
+        // 当月最大绝对值，用于热力分级
+        let maxAbs = 0;
+        Object.keys(daily).forEach(k => {
+            const v = Math.abs(valueOf(daily[k]));
+            if (v > maxAbs) maxAbs = v;
+        });
+
+        const grid = document.getElementById('calendar-grid');
+        if (!grid) return;
+
+        const colorClass = (val) => {
+            if (!val) return { bg: 'bg-slate-100', text: 'text-slate-400' };
+            const positive = type === 'income' || (type === 'net' && val > 0);
+            const base = positive ? 'emerald' : 'teal';
+            const ratio = maxAbs > 0 ? Math.abs(val) / maxAbs : 0;
+            let lvl = ratio <= 0.02 ? '100' : ratio <= 0.25 ? '200'
+                : ratio <= 0.5 ? '300' : ratio <= 0.75 ? '500' : '700';
+            const text = (lvl === '500' || lvl === '700') ? 'text-white' : 'text-slate-700';
+            return { bg: `bg-${base}-${lvl}`, text };
+        };
+
+        const firstDay = new Date(y, m, 1).getDay();   // 0=周日
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+        let html = '';
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div class="aspect-square rounded-lg bg-slate-50/60"></div>`;
+        }
+        for (let day = 1; day <= daysInMonth; day++) {
+            const key = `${monthKey}-${String(day).padStart(2, '0')}`;
+            const d = daily[key];
+            const val = d ? valueOf(d) : 0;
+            const c = colorClass(val);
+            const amountTxt = val ? formatCurrency(val).replace('￥', '') : '';
+            const title = d ? `${key}　${d.count} 笔` : `${key}　无记录`;
+            html += `<div class="aspect-square rounded-lg ${c.bg} ${c.text} p-1.5 flex flex-col justify-between" title="${title}">
+                <div class="text-[10px] leading-none ${val ? '' : 'text-slate-400'}">${day}</div>
+                <div class="text-[10px] font-semibold leading-tight text-right truncate">${amountTxt}</div>
+            </div>`;
+        }
+        grid.innerHTML = html;
+    }
+
+    function calendarPrevMonth() {
+        if (!calendarView) renderCalendar();
+        let { y, m } = calendarView;
+        m--; if (m < 0) { m = 11; y--; }
+        calendarView = { y, m };
+        renderCalendar();
+        renderWeekly();
+    }
+
+    function calendarNextMonth() {
+        if (!calendarView) renderCalendar();
+        let { y, m } = calendarView;
+        m++; if (m > 11) { m = 0; y++; }
+        calendarView = { y, m };
+        renderCalendar();
+        renderWeekly();
+    }
+
+    // 每周花费：按周一至周日拆分所选月份，统计每周支出
+    function renderWeekly() {
+        if (!calendarView) return;
+        const y = calendarView.y, m = calendarView.m;
+        const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const firstDayWeekday = new Date(y, m, 1).getDay();   // 0=周日
+        const offset = (firstDayWeekday + 6) % 7;             // 1号距周一的天数
+        const firstMonday = offset + 1;
+        const totalWeeks = firstMonday <= daysInMonth ? Math.floor((daysInMonth - firstMonday) / 7) + 1 : 1;
+
+        const weeks = [];
+        for (let wi = 0; wi < totalWeeks; wi++) weeks[wi] = { expense: 0, count: 0 };
+
+        (transactions || []).forEach(t => {
+            if (!t || !t.date || getMonthKey(t.date) !== monthKey) return;
+            const day = parseInt(t.date.slice(8, 10), 10);
+            const wi = day < firstMonday ? 0 : Math.floor((day - firstMonday) / 7);
+            if (!weeks[wi]) weeks[wi] = { expense: 0, count: 0 };
+            const amt = Number(t.amount) || 0;
+            if (t.type === 'expense') weeks[wi].expense += amt;
+            weeks[wi].count++;
+        });
+
+        const rows = weeks.map((w, wi) => {
+            const monday = firstMonday + wi * 7;
+            return {
+                start: Math.max(1, monday),
+                end: Math.min(daysInMonth, monday + 6),
+                expense: w.expense,
+                count: w.count
+            };
+        });
+
+        let maxExp = 0, totalExp = 0;
+        rows.forEach(r => { if (r.expense > maxExp) maxExp = r.expense; totalExp += r.expense; });
+
+        const summary = document.getElementById('weekly-summary');
+        const list = document.getElementById('weekly-list');
+        if (summary) summary.textContent = `${monthKey} 共 ${rows.length} 周，合计花费 ${formatCurrency(totalExp)}`;
+        if (!list) return;
+
+        if (rows.every(r => r.expense === 0)) {
+            list.innerHTML = `<div class="text-center text-slate-400 text-xs py-6">本月暂无支出记录</div>`;
+            return;
+        }
+
+        list.innerHTML = rows.map(r => {
+            const pct = maxExp > 0 ? (r.expense / maxExp * 100) : 0;
+            const label = `${String(r.start).padStart(2, '0')}–${String(r.end).padStart(2, '0')}日`;
+            return `<div class="flex items-center gap-3">
+                <div class="w-16 text-[11px] text-slate-500 shrink-0">${label}</div>
+                <div class="flex-1 h-6 bg-slate-50 rounded-lg overflow-hidden">
+                    <div class="h-full rounded-lg bg-teal-400" style="width:${pct}%"></div>
+                </div>
+                <div class="w-24 text-right text-xs font-semibold text-slate-700">${formatCurrency(r.expense)}</div>
+                <div class="w-10 text-right text-[10px] text-slate-400">${r.count}笔</div>
+            </div>`;
+        }).join('');
+    }
+
     function renderAll() {
         renderOverview();
         renderRecordsTable();
         renderReports();
+        renderCalendar();
+        renderWeekly();
         updateFilterDropdowns();
     }
 
@@ -1574,7 +1874,7 @@
     }
 
     function exportDataJSON() {
-        const data = { transactions, categories, accounts, exportedAt: new Date().toISOString() };
+        const data = { transactions, categories, accounts, monthlyBudget, exportedAt: new Date().toISOString() };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1600,6 +1900,10 @@
                     transactions = data.transactions;
                     if (data.categories) categories = { ...DEFAULT_CATEGORIES, ...data.categories };
                     if (data.accounts) accounts = data.accounts;
+                    if (typeof data.monthlyBudget === 'number' && data.monthlyBudget >= 0) {
+                        monthlyBudget = data.monthlyBudget;
+                        saveMonthlyBudget();
+                    }
                     saveData();
                     populateCategoryLists();
                     populateAccountsList();
@@ -1686,7 +1990,7 @@
         setGiteeStatus('正在同步备份到 Gitee 云端...', 'info');
         try {
             const path = 'ledger_workbench_data.json';
-            const payload = Object.assign({ transactions, categories, accounts },
+            const payload = Object.assign({ transactions, categories, accounts, monthlyBudget },
                 window.CloudSync ? window.CloudSync.backupStamp('ledger') : {});
             const contentStr = JSON.stringify(payload, null, 2);
             const base64Content = btoa(encodeURIComponent(contentStr).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1)));
@@ -1737,6 +2041,10 @@
                     if (window.CloudSync) window.CloudSync.resetSince('ledger');
                     if (cloudData.categories) categories = { ...DEFAULT_CATEGORIES, ...cloudData.categories };
                     if (cloudData.accounts) accounts = cloudData.accounts;
+                    if (typeof cloudData.monthlyBudget === 'number' && cloudData.monthlyBudget >= 0) {
+                        monthlyBudget = cloudData.monthlyBudget;
+                        saveMonthlyBudget();
+                    }
                     saveData();
                     populateCategoryLists();
                     populateAccountsList();
@@ -2088,6 +2396,8 @@
         if (!amount || amount <= 0) { showToast('请填写有效金额', 'warning'); return; }
         if (!date) { showToast('请选择日期', 'warning'); return; }
 
+        // OCR 填入是"记一笔"新流程，需显式清掉编辑态，否则可能覆盖正在编辑的记录
+        editingTxId = null;
         setRecordType(type);
         document.getElementById('modal-title').innerText = '记一笔';
         document.getElementById('record-amount').value = amount;
@@ -2134,6 +2444,22 @@
             populateAccountsList();
             renderAll();
         }
+    });
+
+    // 月度预算作为标量整体同步，随实时云同步在手机/电脑间保持一致
+    CloudSync.attach({
+        module: 'ledgerBudget',
+        label: '月度预算',
+        mode: 'single',
+        getSingle: function () { return { budget: monthlyBudget }; },
+        setSingle: function (obj) {
+            if (obj && typeof obj.budget === 'number' && obj.budget >= 0) {
+                monthlyBudget = obj.budget;
+                saveMonthlyBudget();
+                renderBudget();
+            }
+        },
+        onRemoteChange: function () { renderBudget(); }
     });
 </script>
 

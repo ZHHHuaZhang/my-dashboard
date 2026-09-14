@@ -1114,7 +1114,8 @@
 
     function setRecordType(type) {
         currentRecordType = type;
-        editingTxId = null;
+        // 注意：不要在此处重置 editingTxId，否则 openRecordModal 在 setRecordType 之前
+        // 设置的 editingTxId 会被覆盖，导致编辑时变成新增记录（原始记录残留 → 变成两条）。
         const btnExp = document.getElementById('btn-type-expense');
         const btnInc = document.getElementById('btn-type-income');
         const btnTra = document.getElementById('btn-type-transfer');
@@ -2088,6 +2089,8 @@
         if (!amount || amount <= 0) { showToast('请填写有效金额', 'warning'); return; }
         if (!date) { showToast('请选择日期', 'warning'); return; }
 
+        // OCR 填入是"记一笔"新流程，需显式清掉编辑态，否则可能覆盖正在编辑的记录
+        editingTxId = null;
         setRecordType(type);
         document.getElementById('modal-title').innerText = '记一笔';
         document.getElementById('record-amount').value = amount;

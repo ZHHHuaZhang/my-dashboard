@@ -450,6 +450,48 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 股息增长轨迹（占满整行） -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl lg:col-span-3">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h3 class="text-md font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sky-400"></i> 股息增长轨迹
+                        <span class="text-[11px] font-normal text-slate-400">（由每笔买入与表格分红调整自动推导）</span>
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="openBuyModal()" class="px-3 py-1.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 rounded-lg text-xs font-bold text-white transition-all shadow-md flex items-center gap-1">
+                            <i class="fa-solid fa-circle-plus"></i> 登记买入
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 text-center">
+                        <div id="growth-current" class="text-base font-extrabold text-sky-400 font-mono">¥0.00</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">当前预计年分红</div>
+                    </div>
+                    <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 text-center">
+                        <div id="growth-since" class="text-base font-extrabold text-emerald-400 font-mono">¥0.00</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">较首笔记录增长</div>
+                    </div>
+                    <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 text-center">
+                        <div id="growth-buy" class="text-base font-extrabold text-amber-400 font-mono">¥0.00</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">加仓贡献</div>
+                    </div>
+                    <div class="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 text-center">
+                        <div id="growth-div" class="text-base font-extrabold text-rose-400 font-mono">¥0.00</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">分红率提升贡献</div>
+                    </div>
+                </div>
+                <div class="h-64"><canvas id="growth-chart"></canvas></div>
+                <div class="mt-5 pt-4 border-t border-slate-800/40">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] text-slate-400">逐月增量 · 当月较上月新增的预计年分红</span>
+                        <span id="growth-best-month" class="text-[11px] font-bold text-emerald-400"></span>
+                    </div>
+                    <div class="h-52"><canvas id="growth-monthly-chart"></canvas></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">说明：横轴按月份聚合；上方曲线为累计预计年分红，下方柱状为每月环比增量。曲线包含股票与基金的记账分红，货基/理财按当前年化近似计入。每股年分红可在表格「年度每股分红」列直接编辑并自动留痕。</p>
+            </div>
         </div>
 
         <!-- REINVESTMENT SIMULATOR -->
@@ -736,6 +778,58 @@
         </div>
     </div>
 
+    <!-- CUSTOM DIALOG: 登记买入 -->
+    <div id="buy-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-slate-800 max-w-sm w-full mx-4 rounded-2xl p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-md font-bold text-sky-400 flex items-center gap-2"><i class="fa-solid fa-circle-plus"></i> 登记买入</h3>
+                <button onclick="closeBuyModal()" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">标的</label>
+                    <select id="buy-asset" class="w-full glass-input rounded-lg py-2 text-xs"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">日期</label>
+                        <input type="date" id="buy-date" class="w-full glass-input rounded-lg py-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">股数/份</label>
+                        <input type="number" id="buy-shares" min="0" step="10" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如 100">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">买入价(元)</label>
+                    <input type="number" id="buy-price" min="0" step="0.01" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="可选">
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">备注</label>
+                    <input type="text" id="buy-note" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如：分红再投入">
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end mt-5 text-xs">
+                <button onclick="closeBuyModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg">取消</button>
+                <button onclick="submitBuy()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg shadow-md">登记</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- CUSTOM DIALOG: 流水明细 -->
+    <div id="history-modal" class="fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div class="glass-card border border-slate-800 max-w-md w-full mx-4 rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-md font-bold text-sky-400 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> <span id="history-title">买入流水</span></h3>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="history-list" class="space-y-2 text-xs"></div>
+            <div class="flex gap-2 justify-end mt-5 text-xs">
+                <button onclick="closeHistoryModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg">关闭</button>
+            </div>
+        </div>
+    </div>
 
     <!-- JAVASCRIPT CORE -->
     <script>
@@ -766,6 +860,8 @@
             stocks: [...INITIAL_STOCKS],
             funds: [...INITIAL_FUNDS],
             moneyMarket: { ...INITIAL_MONEY_MARKET },
+            lots: [],          // 买入记账流水: {id, assetId, date, shares, price, note}
+            divEvents: [],     // 分红率调整记账: {id, assetId, date, dividend, note}
             resolution: "",
             giteeToken: "",
             giteeUser: "",
@@ -817,6 +913,27 @@
                     if (parsed.giteeToken) state.giteeToken = parsed.giteeToken;
                     if (parsed.giteeUser) state.giteeUser = parsed.giteeUser;
                     if (parsed.giteeRepo) state.giteeRepo = parsed.giteeRepo;
+                    // 记账式流水（兼容旧备份：无 lots/divEvents 时从现有持仓迁移）
+                    if (parsed.lots) state.lots = parsed.lots;
+                    if (parsed.divEvents) state.divEvents = parsed.divEvents;
+                    if (!parsed.lots && (parsed.stocks || parsed.funds)) {
+                        state.lots = [];
+                        const seedDate = new Date().toISOString().slice(0, 10);
+                        (parsed.stocks || []).concat(parsed.funds || []).forEach(a => {
+                            if (a && a.id && (Number(a.shares) || 0) !== 0) {
+                                state.lots.push({ id: 'lot_' + a.id + '_seed', assetId: a.id, date: seedDate, shares: Number(a.shares) || 0, price: Number(a.price) || 0, note: '历史持仓迁移' });
+                            }
+                        });
+                    }
+                    if (!parsed.divEvents && (parsed.stocks || parsed.funds)) {
+                        state.divEvents = [];
+                        const seedDate = new Date().toISOString().slice(0, 10);
+                        (parsed.stocks || []).concat(parsed.funds || []).forEach(a => {
+                            if (a && a.id && (Number(a.dividend) || 0) > 0) {
+                                state.divEvents.push({ id: 'de_' + a.id + '_seed', assetId: a.id, date: seedDate, dividend: Number(a.dividend) || 0, note: '历史分红迁移' });
+                            }
+                        });
+                    }
                 } catch (e) {
                     console.error("本地加载缓存异常", e);
                 }
@@ -966,6 +1083,265 @@
             `;
         }
 
+        // ===================== 记账式流水（买入 / 分红调整） =====================
+        function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+        function findAssetById(id) {
+            return state.stocks.find(s => s.id === id) || state.funds.find(f => f.id === id) || null;
+        }
+        function getAssetLots(id) { return (state.lots || []).filter(l => l.assetId === id); }
+        function getAssetDivEvents(id) {
+            return (state.divEvents || []).filter(d => d.assetId === id)
+                .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+        }
+        function getDerivedShares(id) {
+            return getAssetLots(id).reduce((s, l) => s + (Number(l.shares) || 0), 0);
+        }
+        function getDerivedDividend(id) {
+            const evs = getAssetDivEvents(id);
+            if (evs.length) return Number(evs[evs.length - 1].dividend) || 0;
+            const a = findAssetById(id);
+            return a ? (Number(a.dividend) || 0) : 0;
+        }
+        function getDerivedSharesAsOf(id, date) {
+            return getAssetLots(id).filter(l => l.date <= date).reduce((s, l) => s + (Number(l.shares) || 0), 0);
+        }
+        function getDerivedDividendAsOf(id, date) {
+            const evs = getAssetDivEvents(id).filter(e => e.date <= date);
+            if (evs.length) return Number(evs[evs.length - 1].dividend) || 0;
+            const a = findAssetById(id);
+            return a ? (Number(a.dividend) || 0) : 0;
+        }
+        function addLot(assetId, date, shares, price, note) {
+            if (!state.lots) state.lots = [];
+            state.lots.push({ id: 'lot_' + Date.now() + Math.random().toString(36).slice(2, 6), assetId, date, shares: Number(shares) || 0, price: Number(price) || 0, note: note || '' });
+            saveStateToLocal();
+        }
+        function addDivEvent(assetId, date, dividend, note) {
+            if (!state.divEvents) state.divEvents = [];
+            state.divEvents.push({ id: 'de_' + Date.now() + Math.random().toString(36).slice(2, 6), assetId, date, dividend: Number(dividend) || 0, note: note || '' });
+            saveStateToLocal();
+        }
+        function removeLot(lotId) {
+            state.lots = (state.lots || []).filter(l => l.id !== lotId);
+            saveStateToLocal();
+        }
+        function removeDivEvent(deId) {
+            state.divEvents = (state.divEvents || []).filter(d => d.id !== deId);
+            saveStateToLocal();
+        }
+        // 将每只标的的股数/每股分红重写为流水推导值，保证下方既有渲染逻辑不变
+        function syncDerivedToAssets() {
+            state.stocks.forEach(s => { s.shares = getDerivedShares(s.id); s.dividend = getDerivedDividend(s.id); });
+            state.funds.forEach(f => { f.shares = getDerivedShares(f.id); f.dividend = getDerivedDividend(f.id); });
+        }
+
+        // 首次使用/重置后，若无流水记录则从当前持仓派生初始建仓与分红流水
+        function seedLotsIfEmpty() {
+            if (!state.lots) state.lots = [];
+            if (!state.divEvents) state.divEvents = [];
+            const seedDate = new Date().toISOString().slice(0, 10);
+            if (state.lots.length === 0 && (state.stocks.length || state.funds.length)) {
+                state.stocks.concat(state.funds).forEach(a => {
+                    if (a && a.id && (Number(a.shares) || 0) !== 0) {
+                        state.lots.push({ id: 'lot_' + a.id + '_seed', assetId: a.id, date: seedDate, shares: Number(a.shares) || 0, price: Number(a.price) || 0, note: '初始建仓' });
+                    }
+                });
+            }
+            if (state.divEvents.length === 0 && (state.stocks.length || state.funds.length)) {
+                state.stocks.concat(state.funds).forEach(a => {
+                    if (a && a.id && (Number(a.dividend) || 0) > 0) {
+                        state.divEvents.push({ id: 'de_' + a.id + '_seed', assetId: a.id, date: seedDate, dividend: Number(a.dividend) || 0, note: '初始分红' });
+                    }
+                });
+            }
+        }
+
+        // 股息增长轨迹图表（由每笔买入/分红调整推导）
+        let growthChartInstance = null;
+        let growthMonthlyInstance = null;
+        function computeMMAnnual() {
+            let mm = 0;
+            const prods = (state.moneyMarket && state.moneyMarket.products) || [];
+            prods.forEach(p => { mm += (Number(p.amount) || 0) * (Number(p.apy) || 0) / 100; });
+            return mm;
+        }
+        function renderGrowthChart() {
+            const canvas = document.getElementById('growth-chart');
+            if (!canvas || typeof Chart === 'undefined') return;
+            const assets = state.stocks.concat(state.funds);
+            const mmAnnual = computeMMAnnual();
+            const allDates = [];
+            (state.lots || []).forEach(l => l.date && allDates.push(l.date));
+            (state.divEvents || []).forEach(d => d.date && allDates.push(d.date));
+            allDates.sort();
+
+            const labels = [], totals = [];
+            if (allDates.length) {
+                const start = new Date(allDates[0] + 'T00:00:00');
+                let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+                const last = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                while (cur <= last) {
+                    const y = cur.getFullYear(), m = cur.getMonth();
+                    const ref = `${y}-${String(m + 1).padStart(2, '0')}-15`;
+                    let t = mmAnnual;
+                    assets.forEach(a => { t += getDerivedSharesAsOf(a.id, ref) * getDerivedDividendAsOf(a.id, ref); });
+                    labels.push(`${y}-${String(m + 1).padStart(2, '0')}`);
+                    totals.push(Number(t.toFixed(2)));
+                    cur.setMonth(cur.getMonth() + 1);
+                }
+            }
+
+            // 阶段增长归因：加仓贡献 vs 分红率提升贡献
+            let buyContrib = 0, divContrib = 0;
+            (state.lots || []).forEach(l => { buyContrib += (Number(l.shares) || 0) * getDerivedDividendAsOf(l.assetId, l.date); });
+            (state.divEvents || []).forEach(e => {
+                const evs = getAssetDivEvents(e.assetId);
+                const idx = evs.findIndex(x => x.id === e.id);
+                const prev = idx > 0 ? Number(evs[idx - 1].dividend) : (findAssetById(e.assetId) ? Number(findAssetById(e.assetId).dividend) : 0);
+                divContrib += (Number(e.dividend) - prev) * getDerivedSharesAsOf(e.assetId, e.date);
+            });
+
+            const fmt = v => '¥' + Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+            setEl('growth-current', fmt(totals.length ? totals[totals.length - 1] : mmAnnual));
+            setEl('growth-since', (totals.length && totals[totals.length - 1] - totals[0] >= 0 ? '+' : '') + fmt(totals.length ? totals[totals.length - 1] - totals[0] : 0));
+            setEl('growth-buy', fmt(buyContrib));
+            setEl('growth-div', fmt(divContrib));
+
+            const data = {
+                labels,
+                datasets: [{ label: '预计年分红(元)', data: totals, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.12)', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
+            };
+            if (growthChartInstance) {
+                growthChartInstance.data = data;
+                growthChartInstance.update();
+            } else {
+                growthChartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line', data,
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 8, color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.08)' } },
+                            y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => v >= 10000 ? (v / 10000) + '万' : v }, grid: { color: 'rgba(148,163,184,0.08)' } }
+                        }
+                    }
+                });
+            }
+
+            // 逐月增量柱状图：当月较上月新增的预计年分红
+            const deltas = totals.map((v, i) => i === 0 ? 0 : Number((v - totals[i - 1]).toFixed(2)));
+            const mCanvas = document.getElementById('growth-monthly-chart');
+            if (mCanvas && typeof Chart !== 'undefined') {
+                const mData = {
+                    labels,
+                    datasets: [{
+                        label: '当月新增(元)',
+                        data: deltas,
+                        backgroundColor: deltas.map(d => d >= 0 ? 'rgba(16,185,129,0.65)' : 'rgba(244,63,94,0.65)'),
+                        borderColor: deltas.map(d => d >= 0 ? '#10b981' : '#f43f5e'),
+                        borderWidth: 1,
+                        borderRadius: 3
+                    }]
+                };
+                if (growthMonthlyInstance) {
+                    growthMonthlyInstance.data = mData;
+                    growthMonthlyInstance.update();
+                } else {
+                    growthMonthlyInstance = new Chart(mCanvas.getContext('2d'), {
+                        type: 'bar', data: mData,
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: c => (c.parsed.y >= 0 ? '+' : '') + '¥' + Number(c.parsed.y).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }
+                            },
+                            scales: {
+                                x: { ticks: { maxTicksLimit: 8, color: '#64748b', font: { size: 10 } }, grid: { display: false } },
+                                y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => v >= 10000 ? (v / 10000) + '万' : v }, grid: { color: 'rgba(148,163,184,0.08)' } }
+                            }
+                        }
+                    });
+                }
+                let best = null;
+                deltas.forEach((d, i) => { if (i > 0 && (best === null || d > best.d)) best = { d, label: labels[i] }; });
+                const bestEl = document.getElementById('growth-best-month');
+                if (bestEl) bestEl.innerText = best ? `最佳增长月 ${best.label} +¥${best.d.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+            }
+        }
+
+        // ===================== 记账式弹窗交互 =====================
+        function populateAssetSelect(selId) {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            sel.innerHTML = state.stocks.concat(state.funds)
+                .map(a => `<option value="${a.id}">${a.name}${a.code ? ' (' + a.code + ')' : ''}</option>`).join('');
+        }
+        function openModalHelper(id) {
+            const m = document.getElementById(id);
+            m.classList.remove('hidden');
+            setTimeout(() => m.classList.add('opacity-100'), 10);
+        }
+        function closeModalHelper(id) {
+            const m = document.getElementById(id);
+            m.classList.remove('opacity-100');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+        function openBuyModal(presetId) {
+            populateAssetSelect('buy-asset');
+            if (presetId) document.getElementById('buy-asset').value = presetId;
+            document.getElementById('buy-date').value = todayStr();
+            document.getElementById('buy-shares').value = '';
+            document.getElementById('buy-price').value = '';
+            document.getElementById('buy-note').value = '';
+            openModalHelper('buy-modal');
+        }
+        function closeBuyModal() { closeModalHelper('buy-modal'); }
+        function submitBuy() {
+            const assetId = document.getElementById('buy-asset').value;
+            const date = document.getElementById('buy-date').value || todayStr();
+            const shares = parseFloat(document.getElementById('buy-shares').value) || 0;
+            const price = parseFloat(document.getElementById('buy-price').value) || 0;
+            const note = document.getElementById('buy-note').value.trim();
+            if (!assetId) { showToast('请选择标的', 'warning'); return; }
+            if (shares === 0) { showToast('股数不能为 0', 'warning'); return; }
+            addLot(assetId, date, shares, price, note);
+            calculateDividends();
+            closeBuyModal();
+            showToast(`已登记买入 ${shares} 股（${date}）`, 'success');
+        }
+        function openHistoryModal(assetId) {
+            const a = findAssetById(assetId);
+            document.getElementById('history-title').innerText = `${a ? a.name : '标的'} · 买入流水`;
+            renderHistoryList(assetId);
+            openModalHelper('history-modal');
+        }
+        function closeHistoryModal() { closeModalHelper('history-modal'); }
+        function renderHistoryList(assetId) {
+            const list = document.getElementById('history-list');
+            if (!list) return;
+            const lots = getAssetLots(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
+            const divs = getAssetDivEvents(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
+            let html = `<div class="text-slate-400 font-semibold mb-1">买入记录</div>`;
+            html += lots.length ? '' : `<div class="text-slate-500">暂无</div>`;
+            lots.forEach(l => {
+                html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
+                    <div class="min-w-0"><span class="text-slate-300">${l.date}</span> <span class="text-sky-400 font-mono">${l.shares > 0 ? '+' : ''}${l.shares} 股</span> ${l.price ? `<span class="text-slate-500">@¥${l.price}</span>` : ''} ${l.note ? `<span class="text-slate-500">· ${l.note}</span>` : ''}</div>
+                    <button onclick="removeLot('${l.id}'); renderHistoryList('${assetId}'); calculateDividends();" class="text-rose-400 hover:text-rose-300 ml-2 shrink-0">删除</button>
+                </div>`;
+            });
+            html += `<div class="text-slate-400 font-semibold mt-3 mb-1">分红调整记录</div>`;
+            html += divs.length ? '' : `<div class="text-slate-500">暂无</div>`;
+            divs.forEach(d => {
+                html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
+                    <div class="min-w-0"><span class="text-slate-300">${d.date}</span> <span class="text-emerald-400 font-mono">每股 ¥${d.dividend}</span> ${d.note ? `<span class="text-slate-500">· ${d.note}</span>` : ''}</div>
+                    <button onclick="removeDivEvent('${d.id}'); renderHistoryList('${assetId}'); calculateDividends();" class="text-rose-400 hover:text-rose-300 ml-2 shrink-0">删除</button>
+                </div>`;
+            });
+            list.innerHTML = html;
+        }
+
         // Calculation Core Engine
         function calculateDividends() {
             let totalStockDividend = 0;
@@ -973,6 +1349,9 @@
 
             let totalFundDividend = 0;
             let totalFundValue = 0;
+
+            // 先以记账流水推导每只标的的持仓股数与每股分红
+            syncDerivedToAssets();
 
             // 1. Process Stocks
             const stockTableBody = document.getElementById("stock-list-body");
@@ -1016,9 +1395,14 @@
                         ¥${stockDivTotal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                     <td class="py-4 px-2 text-center">
-                        <button onclick="openDeleteModal('stock', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该股">
-                            <i class="fa-regular fa-trash-can"></i>
-                        </button>
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="openHistoryModal('${stock.id}')" class="text-slate-500 hover:text-sky-400 transition-colors p-1" title="查看/编辑买入流水">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </button>
+                            <button onclick="openDeleteModal('stock', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该股">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
                 stockTableBody.appendChild(row);
@@ -1069,9 +1453,14 @@
                         ¥${fundDivTotal.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                     <td class="py-4 px-2 text-center">
-                        <button onclick="openDeleteModal('fund', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该基金">
-                            <i class="fa-regular fa-trash-can"></i>
-                        </button>
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="openHistoryModal('${fund.id}')" class="text-slate-500 hover:text-sky-400 transition-colors p-1" title="查看/编辑买入流水">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </button>
+                            <button onclick="openDeleteModal('fund', ${index})" class="text-slate-500 hover:text-rose-400 transition-colors p-1" title="删除该基金">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
                 fundTableBody.appendChild(row);
@@ -1183,6 +1572,7 @@
             runDRIPSimulation(totalAssetsValue, totalAnnualDividend);
 
             saveStateToLocal();
+            renderGrowthChart();
         }
 
         function updateMilestones(currentTotalIncome) {
@@ -1214,12 +1604,16 @@
             document.getElementById("milestone-unlocked-count").innerText = `${unlockedCount}/${milestoneCards.length} 已点亮`;
         }
 
-        // Inline Editors: Stocks
+        // Inline Editors: Stocks（股数/分红改为记账式登记，自动写入流水历史）
         function updateStockShares(index, value) {
-            const parsedVal = Math.max(parseFloat(value) || 0, 0);
-            state.stocks[index].shares = parsedVal;
+            const stock = state.stocks[index];
+            if (!stock) return;
+            const newTotal = Math.max(parseFloat(value) || 0, 0);
+            const delta = newTotal - getDerivedShares(stock.id);
+            if (Math.abs(delta) < 1e-9) return;
+            addLot(stock.id, todayStr(), delta, stock.price, delta > 0 ? '手动调整(加仓)' : '手动调整(减仓)');
             calculateDividends();
-            showToast(`已将持仓更新为 ${parsedVal} 股`, "info");
+            showToast(`已登记${delta > 0 ? '买入' : '卖出'} ${Math.abs(delta)} 股`, "info");
         }
 
         function updateStockPrice(index, value) {
@@ -1230,18 +1624,24 @@
         }
 
         function updateStockDividend(index, value) {
-            const parsedVal = Math.max(parseFloat(value) || 0, 0);
-            state.stocks[index].dividend = parsedVal;
+            const stock = state.stocks[index];
+            if (!stock) return;
+            const div = Math.max(parseFloat(value) || 0, 0);
+            addDivEvent(stock.id, todayStr(), div, '手动调整分红');
             calculateDividends();
-            showToast(`预计派息更新为 ¥${parsedVal.toFixed(3)}`, "info");
+            showToast(`已记录每股分红 ¥${div.toFixed(3)}`, "info");
         }
 
         // Inline Editors: Funds
         function updateFundShares(index, value) {
-            const parsedVal = Math.max(parseFloat(value) || 0, 0);
-            state.funds[index].shares = parsedVal;
+            const fund = state.funds[index];
+            if (!fund) return;
+            const newTotal = Math.max(parseFloat(value) || 0, 0);
+            const delta = newTotal - getDerivedShares(fund.id);
+            if (Math.abs(delta) < 1e-9) return;
+            addLot(fund.id, todayStr(), delta, fund.price, delta > 0 ? '手动调整(加仓)' : '手动调整(减仓)');
             calculateDividends();
-            showToast(`已将基金份额更新为 ${parsedVal} 份`, "info");
+            showToast(`已登记${delta > 0 ? '买入' : '卖出'} ${Math.abs(delta)} 份`, "info");
         }
 
         function updateFundPrice(index, value) {
@@ -1587,9 +1987,13 @@
                     return;
                 }
                 state.stocks.push(newAssetObj);
+                addLot(newAssetObj.id, todayStr(), shares, price, '初始建仓');
+                if (dividend > 0) addDivEvent(newAssetObj.id, todayStr(), dividend, '初始分红');
                 showToast(`已添加股票《${newAssetObj.name}》，正在同步市场最新报价...`, "success");
             } else {
                 state.funds.push(newAssetObj);
+                addLot(newAssetObj.id, todayStr(), shares, price, '初始建仓');
+                if (dividend > 0) addDivEvent(newAssetObj.id, todayStr(), dividend, '初始分红');
                 showToast(`已添加${fundType}基金《${newAssetObj.name}》`, "success");
             }
 
@@ -1627,6 +2031,8 @@
                 giteeToken: "",
                 giteeUser: "",
                 giteeRepo: "my-dividend-data",
+                lots: [],
+                divEvents: [],
                 activeAssetTab: "stock"
             };
             
@@ -1870,6 +2276,7 @@
         // Core initializer
         window.onload = function() {
             loadState();
+            seedLotsIfEmpty();
             
             if (state.resolution) {
                 document.getElementById("user-motto").value = state.resolution;
@@ -1916,6 +2323,7 @@
                         if (state.dailyCost) document.getElementById("daily-cost").value = state.dailyCost;
                         switchAssetTab(state.activeAssetTab || "stock");
                         calculateDividends();
+                        renderGrowthChart();
                     } catch (e) { }
                 }
             });

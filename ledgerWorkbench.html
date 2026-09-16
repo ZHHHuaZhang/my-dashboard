@@ -553,7 +553,11 @@
                     <div class="mt-3 pt-3 border-t border-slate-100">
                         <div class="flex gap-2">
                             <input id="new-income-cat" type="text" placeholder="新分类名" class="flex-1 text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-emerald-500">
-                            <select id="new-income-icon" class="text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-emerald-500"></select>
+                            <div class="relative shrink-0" data-icon-picker>
+                                <input type="hidden" id="new-income-icon">
+                                <button type="button" data-icon-btn class="flex items-center justify-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 w-20"></button>
+                                <div data-icon-menu class="hidden absolute z-50 w-48 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 grid grid-cols-5 gap-1"></div>
+                            </div>
                             <button onclick="addCategory('income')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
@@ -567,7 +571,11 @@
                     <div class="mt-3 pt-3 border-t border-slate-100">
                         <div class="flex gap-2">
                             <input id="new-expense-cat" type="text" placeholder="新分类名" class="flex-1 text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-rose-500">
-                            <select id="new-expense-icon" class="text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-rose-500"></select>
+                            <div class="relative shrink-0" data-icon-picker>
+                                <input type="hidden" id="new-expense-icon">
+                                <button type="button" data-icon-btn class="flex items-center justify-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 w-20"></button>
+                                <div data-icon-menu class="hidden absolute z-50 w-48 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 grid grid-cols-5 gap-1"></div>
+                            </div>
                             <button onclick="addCategory('expense')" class="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
@@ -983,15 +991,68 @@
         return list.find(c => c.id === catId) || { name: '未知', icon: 'fa-circle' };
     }
 
+    function closeAllIconMenus() {
+        document.querySelectorAll('[data-icon-menu]').forEach(m => m.classList.add('hidden'));
+    }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-icon-picker]')) closeAllIconMenus();
+    });
+
     function populateIconSelectors() {
-        const incomeSel = document.getElementById('new-income-icon');
-        const expenseSel = document.getElementById('new-expense-icon');
-        if (incomeSel) {
-            incomeSel.innerHTML = INCOME_ICONS.map(i => `<option value="${i}">${i}</option>`).join('');
-        }
-        if (expenseSel) {
-            expenseSel.innerHTML = EXPENSE_ICONS.map(i => `<option value="${i}">${i}</option>`).join('');
-        }
+        [['income', INCOME_ICONS], ['expense', EXPENSE_ICONS]].forEach(([type, icons]) => {
+            const input = document.getElementById(`new-${type}-icon`);
+            if (!input) return;
+            const wrap = input.closest('[data-icon-picker]');
+            if (!wrap) { if (!input.value) input.value = icons[0]; return; }
+            const btn = wrap.querySelector('[data-icon-btn]');
+            const menu = wrap.querySelector('[data-icon-menu]');
+            if (!icons.includes(input.value)) input.value = icons[0];
+
+            // 图标网格只需构建一次（图标列表固定）
+            if (menu.dataset.built !== '1') {
+                menu.innerHTML = icons.map(i =>
+                    `<button type="button" data-icon-opt="${i}" title="${i}" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100"><i class="fa-solid ${i}"></i></button>`
+                ).join('');
+                menu.dataset.built = '1';
+                menu.addEventListener('click', (e) => {
+                    const opt = e.target.closest('[data-icon-opt]');
+                    if (!opt) return;
+                    input.value = opt.dataset.iconOpt;
+                    syncIconPicker(type);
+                    closeAllIconMenus();
+                    e.stopPropagation();
+                });
+            }
+
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const willOpen = menu.classList.contains('hidden');
+                closeAllIconMenus();
+                if (willOpen) {
+                    // 靠近视口底部时向上展开
+                    const r = btn.getBoundingClientRect();
+                    const openUp = r.bottom + 260 > window.innerHeight;
+                    menu.classList.toggle('top-full', !openUp);
+                    menu.classList.toggle('bottom-full', openUp);
+                    menu.classList.remove('hidden');
+                }
+            };
+            syncIconPicker(type);
+        });
+    }
+
+    function syncIconPicker(type) {
+        const input = document.getElementById(`new-${type}-icon`);
+        const wrap = input && input.closest('[data-icon-picker]');
+        if (!wrap) return;
+        const btn = wrap.querySelector('[data-icon-btn]');
+        const menu = wrap.querySelector('[data-icon-menu]');
+        btn.innerHTML = `<i class="fa-solid ${input.value}"></i><i class="fa-solid fa-chevron-down text-[9px] text-slate-400"></i>`;
+        menu.querySelectorAll('[data-icon-opt]').forEach(o => {
+            const on = o.dataset.iconOpt === input.value;
+            o.classList.toggle('bg-emerald-50', on);
+            o.classList.toggle('text-emerald-600', on);
+        });
     }
 
     function updateCategoryDropdowns() {
@@ -1772,11 +1833,11 @@
             const cat = (categories[t.type] || []).find(c => c.id === t.category) || {};
             const sign = t.type === 'expense' ? '-' : '+';
             const amtCls = t.type === 'expense' ? 'text-rose-600' : 'text-emerald-600';
-            const icon = cat.icon || (t.type === 'expense' ? '💸' : '💰');
+            const icon = cat.icon || (t.type === 'expense' ? 'fa-receipt' : 'fa-coins');
             const name = cat.name || (t.type === 'expense' ? '支出' : '收入');
             return `<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-100 last:border-0">
                 <div class="flex items-center gap-1.5 min-w-0">
-                    <span>${escapeHtml(icon)}</span>
+                    <span class="w-4 text-center"><i class="fa-solid ${escapeHtml(icon)}"></i></span>
                     <span class="truncate">${escapeHtml(name)}</span>
                     ${t.note ? `<span class="truncate text-slate-400">${escapeHtml(t.note)}</span>` : ''}
                 </div>

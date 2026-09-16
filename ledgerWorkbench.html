@@ -553,7 +553,11 @@
                     <div class="mt-3 pt-3 border-t border-slate-100">
                         <div class="flex gap-2">
                             <input id="new-income-cat" type="text" placeholder="新分类名" class="flex-1 text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-emerald-500">
-                            <select id="new-income-icon" class="text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-emerald-500"></select>
+                            <div class="relative shrink-0" data-icon-picker>
+                                <input type="hidden" id="new-income-icon">
+                                <button type="button" data-icon-btn class="flex items-center justify-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 w-20"></button>
+                                <div data-icon-menu class="hidden absolute z-50 w-48 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 grid grid-cols-5 gap-1"></div>
+                            </div>
                             <button onclick="addCategory('income')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
@@ -567,7 +571,11 @@
                     <div class="mt-3 pt-3 border-t border-slate-100">
                         <div class="flex gap-2">
                             <input id="new-expense-cat" type="text" placeholder="新分类名" class="flex-1 text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-rose-500">
-                            <select id="new-expense-icon" class="text-xs border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-rose-500"></select>
+                            <div class="relative shrink-0" data-icon-picker>
+                                <input type="hidden" id="new-expense-icon">
+                                <button type="button" data-icon-btn class="flex items-center justify-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 w-20"></button>
+                                <div data-icon-menu class="hidden absolute z-50 w-48 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 grid grid-cols-5 gap-1"></div>
+                            </div>
                             <button onclick="addCategory('expense')" class="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
@@ -658,6 +666,44 @@
                     <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm">保存</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- CATEGORY EDIT MODAL -->
+    <div id="category-edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center hidden p-0 sm:p-4">
+        <div class="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 px-5 py-3 flex-shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-pen-to-square text-emerald-500"></i>
+                    <h3 class="font-bold text-slate-900 text-base">编辑分类</h3>
+                </div>
+                <button onclick="closeCategoryEdit()" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="px-5 py-4 space-y-4">
+                <input type="hidden" id="edit-cat-type">
+                <input type="hidden" id="edit-cat-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">分类名 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="edit-cat-name" placeholder="分类名称" class="w-full text-sm border-slate-300 rounded-lg p-3 bg-slate-50 border focus:ring-2 focus:ring-emerald-500 focus:bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">图标</label>
+                    <div class="relative inline-block" data-icon-picker>
+                        <input type="hidden" id="edit-cat-icon">
+                        <button type="button" data-icon-btn class="flex items-center justify-center gap-1.5 text-xs border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 w-24"></button>
+                        <div data-icon-menu class="hidden absolute z-50 w-48 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 grid grid-cols-5 gap-1"></div>
+                    </div>
+                </div>
+                <p id="edit-cat-info" class="text-xs text-slate-500"></p>
+                <button type="button" id="edit-cat-reassign" onclick="reassignUnknownToCategory()" class="hidden w-full text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg py-2.5 hover:bg-blue-100"></button>
+                <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-1">
+                    <button onclick="closeCategoryEdit()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200">取消</button>
+                    <button onclick="saveCategoryEdit()" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm">保存</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -855,6 +901,7 @@
 
     const INCOME_ICONS = ['fa-salary', 'fa-briefcase', 'fa-hand-holding-dollar', 'fa-coins', 'fa-gift', 'fa-plus'];
     const EXPENSE_ICONS = ['fa-utensils', 'fa-car', 'fa-house', 'fa-shirt', 'fa-gamepad', 'fa-heart-pulse', 'fa-graduation-cap', 'fa-wand-magic-sparkles', 'fa-gift', 'fa-bag-shopping', 'fa-mobile-screen', 'fa-mug-hot', 'fa-bolt'];
+    const ALL_CAT_ICONS = [...new Set([...INCOME_ICONS, ...EXPENSE_ICONS])];
 
     const DEFAULT_CATEGORIES = {
         income: [
@@ -983,15 +1030,74 @@
         return list.find(c => c.id === catId) || { name: '未知', icon: 'fa-circle' };
     }
 
+    function closeAllIconMenus() {
+        document.querySelectorAll('[data-icon-menu]').forEach(m => m.classList.add('hidden'));
+    }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-icon-picker]')) closeAllIconMenus();
+    });
+
+    function initIconPicker(inputId, icons) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const wrap = input.closest('[data-icon-picker]');
+        if (!wrap) { if (!input.value) input.value = icons[0]; return; }
+        const btn = wrap.querySelector('[data-icon-btn]');
+        const menu = wrap.querySelector('[data-icon-menu]');
+        if (!btn || !menu) return;
+        if (!input.value) input.value = icons[0];
+
+        // 图标网格只需构建一次（图标列表固定）
+        if (menu.dataset.built !== '1') {
+            menu.innerHTML = icons.map(i =>
+                `<button type="button" data-icon-opt="${i}" title="${i}" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100"><i class="fa-solid ${i}"></i></button>`
+            ).join('');
+            menu.dataset.built = '1';
+            menu.addEventListener('click', (e) => {
+                const opt = e.target.closest('[data-icon-opt]');
+                if (!opt) return;
+                input.value = opt.dataset.iconOpt;
+                syncIconPicker(input.id);
+                closeAllIconMenus();
+                e.stopPropagation();
+            });
+        }
+
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const willOpen = menu.classList.contains('hidden');
+            closeAllIconMenus();
+            if (willOpen) {
+                // 靠近视口底部时向上展开
+                const r = btn.getBoundingClientRect();
+                const openUp = r.bottom + 260 > window.innerHeight;
+                menu.classList.toggle('top-full', !openUp);
+                menu.classList.toggle('bottom-full', openUp);
+                menu.classList.remove('hidden');
+            }
+        };
+        syncIconPicker(inputId);
+    }
+
+    function syncIconPicker(inputId) {
+        const input = document.getElementById(inputId);
+        const wrap = input && input.closest('[data-icon-picker]');
+        if (!wrap) return;
+        const btn = wrap.querySelector('[data-icon-btn]');
+        const menu = wrap.querySelector('[data-icon-menu]');
+        if (!btn || !menu) return;
+        btn.innerHTML = `<i class="fa-solid ${input.value}"></i><i class="fa-solid fa-chevron-down text-[9px] text-slate-400"></i>`;
+        menu.querySelectorAll('[data-icon-opt]').forEach(o => {
+            const on = o.dataset.iconOpt === input.value;
+            o.classList.toggle('bg-emerald-50', on);
+            o.classList.toggle('text-emerald-600', on);
+        });
+    }
+
     function populateIconSelectors() {
-        const incomeSel = document.getElementById('new-income-icon');
-        const expenseSel = document.getElementById('new-expense-icon');
-        if (incomeSel) {
-            incomeSel.innerHTML = INCOME_ICONS.map(i => `<option value="${i}">${i}</option>`).join('');
-        }
-        if (expenseSel) {
-            expenseSel.innerHTML = EXPENSE_ICONS.map(i => `<option value="${i}">${i}</option>`).join('');
-        }
+        initIconPicker('new-income-icon', INCOME_ICONS);
+        initIconPicker('new-expense-icon', EXPENSE_ICONS);
+        initIconPicker('edit-cat-icon', ALL_CAT_ICONS);
     }
 
     function updateCategoryDropdowns() {
@@ -1047,9 +1153,14 @@
                         <i class="fa-solid ${c.icon} text-emerald-600"></i>
                         <span class="text-sm font-medium">${c.name}</span>
                     </div>
-                    <button onclick="deleteCategory('income', '${c.id}')" class="text-rose-400 hover:text-rose-600 text-xs">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+                    <div class="flex items-center">
+                        <button onclick="openCategoryEdit('income', '${c.id}')" class="text-slate-400 hover:text-emerald-600 text-xs mr-2" title="编辑分类">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteCategory('income', '${c.id}')" class="text-rose-400 hover:text-rose-600 text-xs" title="删除分类">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1060,9 +1171,14 @@
                         <i class="fa-solid ${c.icon} text-rose-500"></i>
                         <span class="text-sm font-medium">${c.name}</span>
                     </div>
-                    <button onclick="deleteCategory('expense', '${c.id}')" class="text-rose-400 hover:text-rose-600 text-xs">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+                    <div class="flex items-center">
+                        <button onclick="openCategoryEdit('expense', '${c.id}')" class="text-slate-400 hover:text-rose-500 text-xs mr-2" title="编辑分类">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteCategory('expense', '${c.id}')" class="text-rose-400 hover:text-rose-600 text-xs" title="删除分类">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1113,6 +1229,78 @@
         updateCategoryDropdowns();
         updateFilterDropdowns();
         renderAll();
+    }
+
+    // 分类是否已不存在（含被删除后标记为 unknown 的流水）
+    function isUnknownCategory(t) {
+        if (!t || t.type === 'transfer') return false;
+        return !(categories[t.type] || []).some(c => c.id === t.category);
+    }
+
+    function openCategoryEdit(type, id) {
+        const cat = (categories[type] || []).find(c => c.id === id);
+        if (!cat) return;
+        document.getElementById('edit-cat-type').value = type;
+        document.getElementById('edit-cat-id').value = id;
+        document.getElementById('edit-cat-name').value = cat.name;
+        document.getElementById('edit-cat-icon').value = cat.icon;
+        const used = transactions.filter(t => t.type === type && t.category === id).length;
+        document.getElementById('edit-cat-info').textContent =
+            `当前有 ${used} 笔流水使用此分类；修改名称或图标后自动对所有流水生效`;
+        const unknownCount = transactions.filter(isUnknownCategory).filter(t => t.type === type).length;
+        const reBtn = document.getElementById('edit-cat-reassign');
+        if (unknownCount > 0) {
+            reBtn.textContent = `将 ${unknownCount} 笔「未知」流水归入此分类`;
+            reBtn.classList.remove('hidden');
+        } else {
+            reBtn.classList.add('hidden');
+        }
+        populateIconSelectors();   // 同步编辑弹窗图标选择器显示
+        document.getElementById('category-edit-modal').classList.remove('hidden');
+    }
+
+    function closeCategoryEdit() {
+        document.getElementById('category-edit-modal').classList.add('hidden');
+    }
+
+    function saveCategoryEdit() {
+        const type = document.getElementById('edit-cat-type').value;
+        const id = document.getElementById('edit-cat-id').value;
+        const name = document.getElementById('edit-cat-name').value.trim();
+        const icon = document.getElementById('edit-cat-icon').value;
+        if (!name) { showToast('请输入分类名', 'error'); return; }
+        const cat = (categories[type] || []).find(c => c.id === id);
+        if (!cat) { closeCategoryEdit(); return; }
+        cat.name = name;
+        cat.icon = icon;
+        saveData();
+        populateCategoryLists();
+        updateCategoryDropdowns();
+        updateFilterDropdowns();
+        renderAll();
+        closeCategoryEdit();
+        showToast('分类已更新，相关流水已同步生效', 'success');
+    }
+
+    // 把该类型下所有"未知"分类的流水归入当前编辑的分类
+    function reassignUnknownToCategory() {
+        const type = document.getElementById('edit-cat-type').value;
+        const id = document.getElementById('edit-cat-id').value;
+        let n = 0;
+        transactions.forEach(t => {
+            if (t.type === type && isUnknownCategory(t)) {
+                t.category = id;
+                n++;
+            }
+        });
+        if (!n) { showToast('没有未知分类的流水', 'info'); return; }
+        saveData();
+        populateCategoryLists();
+        updateCategoryDropdowns();
+        updateFilterDropdowns();
+        renderAll();
+        closeCategoryEdit();
+        showToast(`已将 ${n} 笔未知流水归入该分类`, 'success');
     }
 
     function resetCategories() {
@@ -1680,6 +1868,7 @@
 
     // ===================== 每日花费日历 =====================
     let calendarView = null;   // { y, m } 当前查看的年月（m: 0-11）
+    let calendarDailyTx = {};  // date -> [transactions] 供悬浮明细使用
 
     function renderCalendar() {
         if (!calendarView) {
@@ -1696,9 +1885,12 @@
 
         // 聚合当月每日金额
         const daily = {};   // date -> { expense, income, count }
+        calendarDailyTx = {};
         (transactions || []).forEach(t => {
             if (!t || !t.date || getMonthKey(t.date) !== monthKey) return;
             if (!daily[t.date]) daily[t.date] = { expense: 0, income: 0, count: 0 };
+            if (!calendarDailyTx[t.date]) calendarDailyTx[t.date] = [];
+            calendarDailyTx[t.date].push(t);
             const amt = Number(t.amount) || 0;
             if (t.type === 'expense') daily[t.date].expense += amt;
             else if (t.type === 'income') daily[t.date].income += amt;
@@ -1742,13 +1934,66 @@
             const val = d ? valueOf(d) : 0;
             const c = colorClass(val);
             const amountTxt = val ? formatCurrency(val).replace('￥', '') : '';
-            const title = d ? `${key}　${d.count} 笔` : `${key}　无记录`;
-            html += `<div class="aspect-square rounded-lg ${c.bg} ${c.text} p-1.5 flex flex-col justify-between" title="${title}">
+            html += `<div class="aspect-square rounded-lg ${c.bg} ${c.text} p-1.5 flex flex-col justify-between cursor-pointer" data-date="${key}" onmouseenter="calendarShowTip('${key}', this)" onmouseleave="calendarHideTip()">
                 <div class="text-[10px] leading-none ${val ? '' : 'text-slate-400'}">${day}</div>
                 <div class="text-[10px] font-semibold leading-tight text-right truncate">${amountTxt}</div>
             </div>`;
         }
         grid.innerHTML = html;
+    }
+
+    // 悬浮提示：展示某天详细流水
+    let calendarTipEl = null;
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function calendarShowTip(key, el) {
+        const txs = calendarDailyTx[key] || [];
+        const dt = new Date(key + 'T00:00:00');
+        const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dt.getDay()];
+        let exp = 0, inc = 0;
+        const rows = txs.map(t => {
+            const amt = Number(t.amount) || 0;
+            if (t.type === 'expense') exp += amt; else inc += amt;
+            const cat = (categories[t.type] || []).find(c => c.id === t.category) || {};
+            const sign = t.type === 'expense' ? '-' : '+';
+            const amtCls = t.type === 'expense' ? 'text-rose-600' : 'text-emerald-600';
+            const icon = cat.icon || (t.type === 'expense' ? 'fa-receipt' : 'fa-coins');
+            const name = cat.name || (t.type === 'expense' ? '支出' : '收入');
+            return `<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-100 last:border-0">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-4 text-center"><i class="fa-solid ${escapeHtml(icon)}"></i></span>
+                    <span class="truncate">${escapeHtml(name)}</span>
+                    ${t.note ? `<span class="truncate text-slate-400">${escapeHtml(t.note)}</span>` : ''}
+                </div>
+                <span class="font-semibold ${amtCls} shrink-0">${sign}${formatCurrency(amt)}</span>
+            </div>`;
+        }).join('');
+        if (!calendarTipEl) {
+            calendarTipEl = document.createElement('div');
+            calendarTipEl.id = 'calendar-tip';
+            calendarTipEl.className = 'fixed z-[1000] hidden w-60 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl text-xs text-slate-700';
+            document.body.appendChild(calendarTipEl);
+        }
+        calendarTipEl.innerHTML = `<div class="font-semibold text-slate-900 mb-0.5">${key} ${wd}</div>
+            <div class="text-slate-500 mb-2">支出 ${formatCurrency(exp)}　收入 ${formatCurrency(inc)}　${txs.length} 笔</div>
+            ${txs.length ? `<div>${rows}</div>` : '<div class="text-slate-400">当天无记录</div>'}`;
+        calendarTipEl.classList.remove('hidden');
+        const r = el.getBoundingClientRect();
+        const tw = calendarTipEl.offsetWidth, th = calendarTipEl.offsetHeight;
+        let left = r.right + 8;
+        if (left + tw > window.innerWidth - 8) left = r.left - tw - 8;
+        if (left < 8) left = 8;
+        let top = r.top;
+        if (top + th > window.innerHeight - 8) top = Math.max(8, window.innerHeight - th - 8);
+        if (top < 8) top = 8;
+        calendarTipEl.style.left = left + 'px';
+        calendarTipEl.style.top = top + 'px';
+    }
+    function calendarHideTip() {
+        if (calendarTipEl) calendarTipEl.classList.add('hidden');
     }
 
     function calendarPrevMonth() {

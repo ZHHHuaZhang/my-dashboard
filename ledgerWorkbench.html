@@ -1680,6 +1680,7 @@
 
     // ===================== 每日花费日历 =====================
     let calendarView = null;   // { y, m } 当前查看的年月（m: 0-11）
+    let calendarDailyTx = {};  // date -> [transactions] 供悬浮明细使用
 
     function renderCalendar() {
         if (!calendarView) {
@@ -1696,9 +1697,12 @@
 
         // 聚合当月每日金额
         const daily = {};   // date -> { expense, income, count }
+        calendarDailyTx = {};
         (transactions || []).forEach(t => {
             if (!t || !t.date || getMonthKey(t.date) !== monthKey) return;
             if (!daily[t.date]) daily[t.date] = { expense: 0, income: 0, count: 0 };
+            if (!calendarDailyTx[t.date]) calendarDailyTx[t.date] = [];
+            calendarDailyTx[t.date].push(t);
             const amt = Number(t.amount) || 0;
             if (t.type === 'expense') daily[t.date].expense += amt;
             else if (t.type === 'income') daily[t.date].income += amt;
@@ -1742,13 +1746,66 @@
             const val = d ? valueOf(d) : 0;
             const c = colorClass(val);
             const amountTxt = val ? formatCurrency(val).replace('￥', '') : '';
-            const title = d ? `${key}　${d.count} 笔` : `${key}　无记录`;
-            html += `<div class="aspect-square rounded-lg ${c.bg} ${c.text} p-1.5 flex flex-col justify-between" title="${title}">
+            html += `<div class="aspect-square rounded-lg ${c.bg} ${c.text} p-1.5 flex flex-col justify-between cursor-pointer" data-date="${key}" onmouseenter="calendarShowTip('${key}', this)" onmouseleave="calendarHideTip()">
                 <div class="text-[10px] leading-none ${val ? '' : 'text-slate-400'}">${day}</div>
                 <div class="text-[10px] font-semibold leading-tight text-right truncate">${amountTxt}</div>
             </div>`;
         }
         grid.innerHTML = html;
+    }
+
+    // 悬浮提示：展示某天详细流水
+    let calendarTipEl = null;
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function calendarShowTip(key, el) {
+        const txs = calendarDailyTx[key] || [];
+        const dt = new Date(key + 'T00:00:00');
+        const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dt.getDay()];
+        let exp = 0, inc = 0;
+        const rows = txs.map(t => {
+            const amt = Number(t.amount) || 0;
+            if (t.type === 'expense') exp += amt; else inc += amt;
+            const cat = (categories[t.type] || []).find(c => c.id === t.category) || {};
+            const sign = t.type === 'expense' ? '-' : '+';
+            const amtCls = t.type === 'expense' ? 'text-rose-600' : 'text-emerald-600';
+            const icon = cat.icon || (t.type === 'expense' ? '💸' : '💰');
+            const name = cat.name || (t.type === 'expense' ? '支出' : '收入');
+            return `<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-100 last:border-0">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <span>${escapeHtml(icon)}</span>
+                    <span class="truncate">${escapeHtml(name)}</span>
+                    ${t.note ? `<span class="truncate text-slate-400">${escapeHtml(t.note)}</span>` : ''}
+                </div>
+                <span class="font-semibold ${amtCls} shrink-0">${sign}${formatCurrency(amt)}</span>
+            </div>`;
+        }).join('');
+        if (!calendarTipEl) {
+            calendarTipEl = document.createElement('div');
+            calendarTipEl.id = 'calendar-tip';
+            calendarTipEl.className = 'fixed z-[1000] hidden w-60 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl text-xs text-slate-700';
+            document.body.appendChild(calendarTipEl);
+        }
+        calendarTipEl.innerHTML = `<div class="font-semibold text-slate-900 mb-0.5">${key} ${wd}</div>
+            <div class="text-slate-500 mb-2">支出 ${formatCurrency(exp)}　收入 ${formatCurrency(inc)}　${txs.length} 笔</div>
+            ${txs.length ? `<div>${rows}</div>` : '<div class="text-slate-400">当天无记录</div>'}`;
+        calendarTipEl.classList.remove('hidden');
+        const r = el.getBoundingClientRect();
+        const tw = calendarTipEl.offsetWidth, th = calendarTipEl.offsetHeight;
+        let left = r.right + 8;
+        if (left + tw > window.innerWidth - 8) left = r.left - tw - 8;
+        if (left < 8) left = 8;
+        let top = r.top;
+        if (top + th > window.innerHeight - 8) top = Math.max(8, window.innerHeight - th - 8);
+        if (top < 8) top = 8;
+        calendarTipEl.style.left = left + 'px';
+        calendarTipEl.style.top = top + 'px';
+    }
+    function calendarHideTip() {
+        if (calendarTipEl) calendarTipEl.classList.add('hidden');
     }
 
     function calendarPrevMonth() {

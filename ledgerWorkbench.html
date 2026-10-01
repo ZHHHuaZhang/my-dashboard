@@ -654,6 +654,7 @@
 
                 <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 sticky bottom-0 bg-white pb-safe">
                     <button type="button" onclick="closeRecordModal()" class="w-full sm:w-auto px-4 py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200">取消</button>
+                    <button type="button" onclick="saveRecord(true)" class="w-full sm:w-auto px-4 py-3 bg-white border border-emerald-500 text-emerald-600 rounded-xl text-sm font-semibold hover:bg-emerald-50">保存并再记一笔</button>
                     <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm">保存</button>
                 </div>
             </form>
@@ -1387,14 +1388,24 @@
         updateCategoryDropdowns();
     }
 
-    function openRecordModal(tx = null) {
+    // 新记录默认日期：记住上一次用过的日期，避免每次都从"今天"开始反复调整
+    const LAST_DATE_KEY = 'ledger-last-date';
+    function getDefaultRecordDate() {
+        return localStorage.getItem(LAST_DATE_KEY) || new Date().toISOString().split('T')[0];
+    }
+
+    function openRecordModal(tx = null, copy = false) {
         editingTxId = null;
         if (tx) {
-            editingTxId = tx.id;
-            document.getElementById('modal-title').innerText = '编辑交易';
+            if (copy) {
+                document.getElementById('modal-title').innerText = '复制记一笔';
+            } else {
+                editingTxId = tx.id;
+                document.getElementById('modal-title').innerText = '编辑交易';
+            }
             currentRecordType = tx.type;
             setRecordType(tx.type);
-            document.getElementById('record-amount').value = tx.amount;
+            document.getElementById('record-amount').value = copy ? '' : tx.amount;
             document.getElementById('record-category').value = tx.category;
             document.getElementById('record-account').value = tx.account;
             document.getElementById('record-date').value = tx.date;
@@ -1404,30 +1415,35 @@
             document.getElementById('modal-title').innerText = '记一笔';
             setRecordType('expense');
             document.getElementById('record-amount').value = '';
-            document.getElementById('record-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('record-date').value = getDefaultRecordDate();
             const now = new Date();
             document.getElementById('record-time').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
             document.getElementById('record-note').value = '';
         }
         document.getElementById('record-modal').classList.remove('hidden');
+        if (copy) {
+            const amt = document.getElementById('record-amount');
+            if (amt) amt.focus();
+        }
     }
 
     function closeRecordModal() {
         document.getElementById('record-modal').classList.add('hidden');
     }
 
-    function handleRecordSubmit(e) {
-        e.preventDefault();
+    // keepOpen=true：保存后保留弹窗，并保留日期/类型/分类/账户，仅清空金额与备注，便于同一天连续记账
+    function saveRecord(keepOpen = false) {
         const amount = parseFloat(document.getElementById('record-amount').value);
         if (!amount || amount <= 0) { showToast('金额必须大于 0', 'error'); return; }
 
+        const dateVal = document.getElementById('record-date').value;
         const tx = {
             id: editingTxId || ('tx-' + Date.now()),
             type: currentRecordType,
             amount,
             category: document.getElementById('record-category').value,
             account: document.getElementById('record-account').value,
-            date: document.getElementById('record-date').value,
+            date: dateVal,
             time: document.getElementById('record-time').value || '12:00',
             note: document.getElementById('record-note').value.trim()
         };
@@ -1440,10 +1456,33 @@
             transactions.push(tx);
             showToast('交易已保存', 'success');
         }
+        if (dateVal) localStorage.setItem(LAST_DATE_KEY, dateVal);
         transactions.sort((a,b) => (a.date + (a.time||'')).localeCompare(b.date + (b.time||'')));
         saveData();
-        closeRecordModal();
         renderAll();
+
+        if (keepOpen) {
+            editingTxId = null;
+            document.getElementById('modal-title').innerText = '记一笔（继续）';
+            document.getElementById('record-amount').value = '';
+            document.getElementById('record-note').value = '';
+            const amt = document.getElementById('record-amount');
+            if (amt) amt.focus();
+        } else {
+            closeRecordModal();
+        }
+    }
+
+    function handleRecordSubmit(e) {
+        e.preventDefault();
+        saveRecord(false);
+    }
+
+    // 复制一笔：以该记录为模板新建（预填类型/分类/账户/日期/时间，金额清空待填）
+    function copyTransaction(id) {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+        openRecordModal(tx, true);
     }
 
     function deleteTransaction(id) {
@@ -1716,8 +1755,9 @@
                 <td class="py-2.5 px-3 text-slate-500">${accName}</td>
                 <td class="py-2.5 px-3 text-slate-500">${t.note || '-'}</td>
                 <td class="py-2.5 px-3 text-right font-bold ${amtClass}">${amt}</td>
-                <td class="py-2.5 px-3 text-center">
+                <td class="py-2.5 px-3 text-center whitespace-nowrap">
                     <button data-id="${t.id}" class="text-blue-500 hover:text-blue-700 mr-2 btn-edit-tx-desk" title="编辑"><i class="fa-solid fa-pen text-xs"></i></button>
+                    <button data-id="${t.id}" class="text-emerald-500 hover:text-emerald-700 mr-2 btn-copy-tx-desk" title="复制一笔"><i class="fa-solid fa-copy text-xs"></i></button>
                     <button data-id="${t.id}" class="text-rose-400 hover:text-rose-600 btn-del-tx-desk" title="删除"><i class="fa-solid fa-trash text-xs"></i></button>
                 </td>
             </tr>`;
@@ -1740,8 +1780,9 @@
                     </div>
                     <div class="text-[11px] text-slate-400 truncate mt-0.5">${t.date}${t.time ? ' · ' + t.time : ''}${t.note ? ' · ' + t.note : ''}</div>
                 </div>
-                <div class="text-right flex-shrink-0">
+                <div class="text-right flex-shrink-0 flex items-center gap-1">
                     <div class="text-base font-bold ${amtClass}">${amt}</div>
+                    <button data-id="${t.id}" class="btn-copy-tx-mob text-slate-300 hover:text-emerald-600 p-1" title="复制一笔"><i class="fa-solid fa-copy text-xs"></i></button>
                 </div>
             </div>`;
         }).join('');
@@ -1753,11 +1794,17 @@
                 if (tx) openRecordModal(tx);
             });
         });
+        tbody.querySelectorAll('.btn-copy-tx-desk').forEach(btn => {
+            btn.addEventListener('click', () => copyTransaction(btn.getAttribute('data-id')));
+        });
         tbody.querySelectorAll('.btn-del-tx-desk').forEach(btn => {
             btn.addEventListener('click', () => {
                 const id = btn.getAttribute('data-id');
                 deleteTransaction(id);
             });
+        });
+        cardsBody.querySelectorAll('.btn-copy-tx-mob').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); copyTransaction(btn.getAttribute('data-id')); });
         });
         cardsBody.querySelectorAll('.record-card').forEach(card => {
             card.addEventListener('click', (e) => {

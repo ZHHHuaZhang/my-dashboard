@@ -215,7 +215,7 @@
             </div>
 
             <span class="text-[11px] text-slate-400 hidden xl:inline-block ml-2">
-                <i data-lucide="info" class="w-3.5 h-3.5 inline mr-0.5"></i>双击任意表格行或点击编辑图标即可直接开启【行内实时编辑】
+                <i data-lucide="info" class="w-3.5 h-3.5 inline mr-0.5"></i>点击行尾的编辑图标，在弹窗中修改该条记录
             </span>
         </div>
 
@@ -260,175 +260,7 @@
                         </td>
                     </tr>
                     <tr v-for="item in filteredItems" :key="item.id" 
-                        @dblclick="startInlineEdit(item)"
-                        :class="editingRowId === item.id ? 'bg-indigo-50/40 border-y-2 border-indigo-200' : 'hover:bg-slate-50/80'"
-                        class="transition">
-
-                        <!-- Inline Edit Mode Cell Rendering -->
-                        <template v-if="editingRowId === item.id">
-                            <!-- 代码/名称/类别 (Inline) -->
-                            <td class="p-3 pl-6 space-y-1">
-                                <input type="text" v-model="inlineForm.name" placeholder="名称" class="w-full px-2 py-1 bg-white border border-indigo-300 rounded text-xs font-bold focus:ring-1 focus:ring-indigo-500">
-                                <div class="flex gap-1">
-                                    <input type="text" v-model="inlineForm.code" placeholder="代码" class="w-1/2 px-2 py-1 bg-white border border-indigo-300 rounded text-[11px] font-mono">
-                                    <select v-model="inlineForm.type" class="w-1/2 px-1 py-1 bg-white border border-indigo-300 rounded text-[10px]">
-                                        <option value="场内基金">场内</option>
-                                        <option value="场外基金">场外</option>
-                                        <option value="股票">股票</option>
-                                    </select>
-                                </div>
-                            </td>
-
-                            <!-- 买入日期 (Inline) -->
-                            <td class="p-3">
-                                <input type="date" v-model="inlineForm.buyDate" class="w-full px-1.5 py-1 bg-white border border-indigo-300 rounded text-[11px]">
-                            </td>
-
-                            <!-- 买入净值 (Inline) -->
-                            <td class="p-3 text-right">
-                                <input type="number" step="0.0001" v-model.number="inlineForm.buyNav" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
-                            </td>
-
-                            <!-- 投入本金 (Inline) -->
-                            <td class="p-3 text-right">
-                                <input type="number" step="0.01" v-model.number="inlineForm.principal" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono font-semibold text-xs">
-                            </td>
-
-                            <!-- 手续费 (Inline) -->
-                            <td class="p-3 text-right">
-                                <input type="number" step="0.01" v-model.number="inlineForm.buyFee" @input="autoCalcInlineShares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
-                            </td>
-
-                            <!-- 持有份额 (Inline) -->
-                            <td class="p-3 text-right">
-                                <input type="number" step="0.01" v-model.number="inlineForm.shares" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
-                            </td>
-
-                            <!-- 最新价格 (Inline) -->
-                            <td class="p-3 text-right space-y-1">
-                                <input type="number" step="0.0001" v-model.number="inlineForm.latestPrice" placeholder="最新价" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
-                            </td>
-
-                            <!-- 卖出价格 (Inline) -->
-                            <td class="p-3 text-right space-y-1">
-                                <template v-if="inlineForm.status === '已卖出'">
-                                    <input type="number" step="0.0001" v-model.number="inlineForm.sellPrice" @input="autoCalcInlineRedeem" placeholder="卖出价" class="w-full text-right px-1.5 py-1 bg-white border border-indigo-300 rounded font-mono text-xs" title="卖出成交单价">
-                                    <input type="number" step="0.01" min="0" v-model.number="inlineForm.sellFee" @input="autoCalcInlineRedeem" placeholder="手续费" class="w-full text-right px-1.5 py-1 bg-white border border-amber-300 rounded font-mono text-[10px]" title="卖出手续费/交易损耗">
-                                </template>
-                                <template v-else>
-                                    <div class="text-slate-400 text-xs">-</div>
-                                </template>
-                            </td>
-
-                            <!-- 持有天数 (Dynamic preview) -->
-                            <td class="p-3 text-center font-mono text-[11px] text-slate-500">
-                                {{ getItemDays(inlineForm) }} 天
-                            </td>
-
-                            <!-- 卖出/浮动收益率 (Dynamic preview) -->
-                            <td class="p-3 text-right font-mono font-bold" :class="getItemReturnRate(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                                {{ getItemReturnRate(inlineForm) >= 0 ? '+' : '' }}{{ (getItemReturnRate(inlineForm) * 100).toFixed(2) }}%
-                            </td>
-
-                            <!-- 独立实际年化 (Dynamic preview) -->
-                            <td class="p-3 text-right font-mono font-bold" :class="getItemCAGR(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                                {{ getItemCAGR(inlineForm) >= 0 ? '+' : '' }}{{ getItemCAGR(inlineForm).toFixed(2) }}%
-                            </td>
-
-                            <!-- 股息率 / 年化分红 (Editable inline) 仅在股票tab显示 -->
-                            <td v-if="filterType === '股票'" class="p-3 text-right font-mono font-bold space-y-1">
-                                <template v-if="inlineForm.type === '股票'">
-                                    <div class="flex flex-col items-end gap-1">
-                                        <div class="flex items-center gap-1">
-                                            <span class="text-[10px] text-slate-400">每股分红:</span>
-                                            <input type="number" step="0.001" v-model.number="inlineForm.dividend"
-                                                   class="w-16 text-right px-1 py-0.5 bg-white border border-amber-300 rounded font-mono text-[11px] focus:ring-1 focus:ring-amber-400 focus:outline-none"
-                                                   placeholder="0.000">
-                                        </div>
-                                        <div class="flex items-center gap-1 text-[11px]">
-                                            <!-- YOC 成本股息率（主指标） -->
-                                            <span class="px-1.5 py-0.5 rounded font-extrabold"
-                                                  :class="getDividendYieldOnCost(inlineForm) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'"
-                                                  :title="'买入成本股息率 YOC（按买入价计算）'">
-                                                {{ getDividendYieldOnCost(inlineForm) > 0 ? getDividendYieldOnCost(inlineForm).toFixed(2) + '%' : '-' }}
-                                            </span>
-                                            <!-- 实时股息率（参考） -->
-                                            <span v-if="getDividendYield(inlineForm) > 0 && Math.abs(getDividendYield(inlineForm) - getDividendYieldOnCost(inlineForm)) > 0.01"
-                                                  class="px-1 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200"
-                                                  :title="'实时股息率（按现价计算）'">
-                                                今{{ getDividendYield(inlineForm).toFixed(2) }}%
-                                            </span>
-                                            <span v-if="getItemAnnualDividend(inlineForm) > 0" class="text-emerald-600 font-semibold">
-                                                →¥{{ formatMoney(getItemAnnualDividend(inlineForm)) }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <template v-else>
-                                    <span class="text-slate-300">-</span>
-                                </template>
-                            </td>
-
-                            <!-- 获利金额 (Dynamic preview) + 场外基金累计实收分红输入框 inline editable -->
-                            <td class="p-3 text-right space-y-1.5">
-                                <!-- 主：获利金额预览 -->
-                                <div class="font-mono font-bold text-sm leading-tight"
-                                     :class="getItemProfit(inlineForm) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                                    {{ getItemProfit(inlineForm) >= 0 ? '+' : '' }}¥ {{ formatMoney(getItemProfit(inlineForm)) }}
-                                </div>
-                                <!-- 次：获利构成徽标预览（含分红 >0 时显示） -->
-                                <div v-if="inlineForm.type === '场外基金' && inlineForm.status === '已卖出' && inlineForm.dividendReceived && Number(inlineForm.dividendReceived) > 0"
-                                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold whitespace-nowrap bg-emerald-100 border border-emerald-200 text-emerald-700 mx-auto">
-                                    <span>含分红 ¥{{ formatMoney(Number(inlineForm.dividendReceived)) }}</span>
-                                </div>
-                                <!-- 编辑框：场外基金 + 已卖出 → 显示累计实收分红 输入 -->
-                                <div v-if="inlineForm.type === '场外基金' && inlineForm.status === '已卖出'"
-                                     class="flex items-center justify-end gap-1 pt-0.5 border-t border-emerald-100 mt-1">
-                                    <span class="text-[10px] text-emerald-600 font-bold whitespace-nowrap flex items-center gap-0.5" title="持有期间累计实收分红(元)，会计入最终已实现收益">
-                                        <i data-lucide="gift" class="w-2.5 h-2.5"></i>实收分红
-                                    </span>
-                                    <input type="number" step="0.01" min="0"
-                                           v-model.number="inlineForm.dividendReceived"
-                                           placeholder="0.00"
-                                           title="持有期间累计实收分红(元)，自动计入已实现收益"
-                                           class="w-20 text-right px-1.5 py-0.5 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-300 rounded font-mono text-[11px] font-semibold text-emerald-800 placeholder-emerald-400 focus:ring-1 focus:ring-emerald-400 focus:outline-none">
-                                </div>
-                            </td>
-
-                            <!-- 状态 (Inline) -->
-                            <td class="p-3 text-center">
-                                <select v-model="inlineForm.status" class="px-2 py-1 bg-white border border-indigo-300 rounded text-xs font-bold">
-                                    <option value="持有中">持有中</option>
-                                    <option value="已卖出">已卖出</option>
-                                </select>
-                            </td>
-
-                            <!-- 计划加仓 (Inline) -->
-                            <td class="p-3 text-right">
-                                <input type="number" step="100" v-model.number="inlineForm.planAddAmount" class="w-full text-right px-1 py-1 bg-white border border-indigo-300 rounded font-mono text-xs">
-                            </td>
-
-                            <!-- 清仓后涨跌幅 (Inline) -->
-                            <td class="p-3 text-right font-mono font-bold" :class="inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice && (inlineForm.latestPrice - inlineForm.sellPrice) >= 0 ? 'text-rose-600' : inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice && (inlineForm.latestPrice - inlineForm.sellPrice) < 0 ? 'text-emerald-600' : 'text-slate-400'">
-                                {{ inlineForm.status === '已卖出' && inlineForm.sellPrice && inlineForm.latestPrice ? ((inlineForm.latestPrice - inlineForm.sellPrice) / inlineForm.sellPrice >= 0 ? '+' : '') + (((inlineForm.latestPrice - inlineForm.sellPrice) / inlineForm.sellPrice) * 100).toFixed(2) + '%' : '-' }}
-                            </td>
-
-                            <!-- 操作 (Inline Save/Cancel) -->
-                            <td class="p-3 pr-6 text-center">
-                                <div class="flex items-center justify-center space-x-1.5">
-                                    <button @click="saveInlineEdit" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1" title="保存修改">
-                                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                                        <span>保存</span>
-                                    </button>
-                                    <button @click="cancelInlineEdit" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition" title="取消编辑">
-                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </template>
-
-                        <!-- Standard Row Display Mode -->
-                        <template v-else>
+                        class="hover:bg-slate-50/80 transition">
                             <!-- 代码/名称/类别 -->
                             <td class="p-4 pl-6">
                                 <div class="font-bold text-slate-900 text-sm">{{ item.name }}</div>
@@ -563,11 +395,8 @@
                             <!-- 操作按键 -->
                             <td class="p-4 pr-6 text-center">
                                 <div class="flex items-center justify-center space-x-2">
-                                    <button @click="startInlineEdit(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="开启行内编辑">
+                                    <button @click="openModal(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="编辑记录">
                                         <i data-lucide="edit-2" class="w-4 h-4"></i>
-                                    </button>
-                                    <button @click="openModal(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="弹窗全面编辑">
-                                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
                                     </button>
                                     <button @click="quickSellToggle(item)" class="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-100 rounded-lg transition" :title="item.status === '持有中' ? '设为清仓卖出' : '还原为持有中'">
                                         <i data-lucide="circle-dollar-sign" class="w-4 h-4"></i>
@@ -577,7 +406,6 @@
                                     </button>
                                 </div>
                             </td>
-                        </template>
                     </tr>
                 </tbody>
             </table>
@@ -675,8 +503,8 @@
                             <span class="text-emerald-500 font-normal text-[11px] ml-1">【腾讯行情接口自动派生 · 零额外请求】</span>
                         </label>
                         <div class="flex gap-2 items-start">
-                            <input type="number" step="0.001" v-model.number="form.dividend" placeholder="点击「一键刷新现价」自动拉取" readonly
-                                   class="flex-1 px-3 py-2 border border-emerald-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-400 focus:outline-none bg-emerald-50/60 font-mono cursor-not-allowed">
+                            <input type="number" step="0.001" v-model.number="form.dividend" placeholder="点击「一键刷新现价」自动拉取，也可手动调整"
+                                   class="flex-1 px-3 py-2 border border-emerald-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-400 focus:outline-none bg-emerald-50/60 font-mono">
                             <div class="flex flex-col items-end gap-0.5 text-right whitespace-nowrap">
                                 <!-- 成本股息率 YOC：按买入价计算（主显示，对用户最有意义） -->
                                 <div class="flex items-center gap-1">
@@ -702,7 +530,7 @@
                         </div>
                         <p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
                             <i data-lucide="info" class="w-3 h-3 inline mr-0.5 -mt-0.5"></i>
-                            数据来源：腾讯 qt.gtimg.cn 接口「第 64 号字段 TTM 股息率」× 当前价 ÷ 100 = 每股年度分红。<b class="text-amber-600">YOC 成本股息率</b> = 每股分红 / 买入价（反映您这笔投入实际能到手的分红回报）。点击左上角「一键刷新现价」同步所有数据，如需手动微调请双击表格对应行。
+                            数据来源：腾讯 qt.gtimg.cn 接口「第 64 号字段 TTM 股息率」× 当前价 ÷ 100 = 每股年度分红。<b class="text-amber-600">YOC 成本股息率</b> = 每股分红 / 买入价（反映您这笔投入实际能到手的分红回报）。点击左上角「一键刷新现价」同步所有数据，如需手动微调可点击对应行的编辑图标，在弹窗内修改。
                         </p>
                     </div>
                 </div>
@@ -1170,10 +998,6 @@ createApp({
         const filterStatus = ref('全部状态');
         const searchQuery = ref('');
 
-        // Inline Edit State
-        const editingRowId = ref(null);
-        const inlineForm = ref({});
-
         const modalOpen = ref(false);
         const isRefreshing = ref(false);
         const aiModalOpen = ref(false);
@@ -1539,63 +1363,6 @@ createApp({
                 const fee = Number(form.value.sellFee || 0);
                 form.value.sellRedeemAmount = Number((gross - fee).toFixed(2));
             }
-        };
-
-        // Inline Editing Logic
-        const startInlineEdit = (item) => {
-            editingRowId.value = item.id;
-            inlineForm.value = JSON.parse(JSON.stringify(item));
-            nextTick(() => lucide.createIcons());
-        };
-
-        const cancelInlineEdit = () => {
-            editingRowId.value = null;
-            inlineForm.value = {};
-            nextTick(() => lucide.createIcons());
-        };
-
-        const autoCalcInlineShares = () => {
-            if (inlineForm.value.principal && inlineForm.value.buyNav && inlineForm.value.buyNav > 0) {
-                const netCapital = inlineForm.value.principal - (inlineForm.value.buyFee || 0);
-                inlineForm.value.shares = Number((netCapital / inlineForm.value.buyNav).toFixed(2));
-            }
-        };
-
-        const autoCalcInlineRedeem = () => {
-            if (inlineForm.value.shares && inlineForm.value.sellPrice) {
-                const gross = Number((inlineForm.value.shares * inlineForm.value.sellPrice).toFixed(2));
-                const fee = Number(inlineForm.value.sellFee || 0);
-                inlineForm.value.sellRedeemAmount = Number((gross - fee).toFixed(2));
-            }
-        };
-
-        const saveInlineEdit = () => {
-            if (!inlineForm.value.id) return;
-            const idx = items.value.findIndex(i => i.id === inlineForm.value.id);
-            if (idx !== -1) {
-                const existing = items.value[idx];
-                items.value[idx] = {
-                    ...inlineForm.value,
-                    principal: Number(inlineForm.value.principal || 0),
-                    buyNav: Number(inlineForm.value.buyNav || 0),
-                    buyFee: Number(inlineForm.value.buyFee || 0),
-                    shares: Number(inlineForm.value.shares || 0),
-                    latestPrice: Number(inlineForm.value.latestPrice || inlineForm.value.buyNav || 0),
-                    dividend: inlineForm.value.dividend !== undefined && inlineForm.value.dividend !== null && inlineForm.value.dividend !== ''
-                        ? Number(inlineForm.value.dividend) : null,
-                    // 场外基金：累计实收分红；inline 没改动时保留旧数据（不在 inline 里改）
-                    dividendReceived: (inlineForm.value.dividendReceived !== undefined && inlineForm.value.dividendReceived !== null && inlineForm.value.dividendReceived !== '')
-                        ? Number(inlineForm.value.dividendReceived)
-                        : (existing.dividendReceived || null),
-                    sellPrice: inlineForm.value.sellPrice ? Number(inlineForm.value.sellPrice) : null,
-                    sellFee: Number(inlineForm.value.sellFee || 0),
-                    sellRedeemAmount: inlineForm.value.sellRedeemAmount ? Number(inlineForm.value.sellRedeemAmount) : null,
-                    planAddAmount: Number(inlineForm.value.planAddAmount || 0)
-                };
-            }
-            saveToStorage();
-            updateCharts();
-            cancelInlineEdit();
         };
 
         const openModal = (item = null) => {
@@ -2602,10 +2369,15 @@ ${JSON.stringify(items.value.map(i => ({
             return Number(val).toFixed(decimals);
         };
 
+        // 表格行由数据动态渲染，行内图标必须在 DOM 更新后再交给 lucide 转换，否则默认不显示
+        watch(filteredItems, () => {
+            nextTick(() => { if (window.lucide) lucide.createIcons(); });
+        });
+
         onMounted(() => {
             loadFromStorage();
             updateCharts();
-            lucide.createIcons();
+            nextTick(() => { if (window.lucide) lucide.createIcons(); });
 
             // ===================== CLOUDBASE 云同步 =====================
             if (window.CloudSync) {
@@ -2631,8 +2403,6 @@ ${JSON.stringify(items.value.map(i => ({
             searchQuery,
             filteredItems,
             summary,
-            editingRowId,
-            inlineForm,
             modalOpen,
             editingItem,
             form,
@@ -2650,11 +2420,6 @@ ${JSON.stringify(items.value.map(i => ({
             stockDividendSummary,
             autoCalcShares,
             autoCalcRedeem,
-            startInlineEdit,
-            cancelInlineEdit,
-            autoCalcInlineShares,
-            autoCalcInlineRedeem,
-            saveInlineEdit,
             openModal,
             saveItem,
             quickSellToggle,

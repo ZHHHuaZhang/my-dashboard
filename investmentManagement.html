@@ -233,7 +233,13 @@
             <table class="w-full text-left border-collapse min-w-[950px] sm:min-w-[1100px] lg:min-w-[1350px]">
                 <thead>
                     <tr class="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] sm:text-xs font-semibold tracking-wider">
-                        <th class="px-2 py-3 sm:p-4 sm:pl-6 min-w-[140px] sm:min-w-[170px]">代码 / 名称 / 类别</th>
+                        <th class="px-2 py-3 sm:p-4 sm:pl-6 min-w-[140px] sm:min-w-[170px]">
+                            <div>代码 / 名称 / 类别</div>
+                            <div class="mt-1.5 flex gap-1">
+                                <input v-model="codeFilter" type="text" placeholder="代码" class="w-1/2 min-w-0 px-1.5 py-1 bg-white border border-slate-200 rounded text-[10px] font-normal normal-case tracking-normal focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                                <input v-model="nameFilter" type="text" placeholder="名称" class="w-1/2 min-w-0 px-1.5 py-1 bg-white border border-slate-200 rounded text-[10px] font-normal normal-case tracking-normal focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                        </th>
                         <th @click="toggleSort('buyDate')" class="px-2 py-3 sm:p-4 min-w-[100px] sm:min-w-[120px] cursor-pointer select-none hover:text-slate-700" title="点击按买入日期排序">买入日期<span class="ml-1 text-[9px]" :class="sortKey === 'buyDate' ? 'text-indigo-600' : 'text-slate-300'">{{ sortKey === 'buyDate' ? (sortDir === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
                         <th class="px-2 py-3 sm:p-4 text-right min-w-[80px] sm:min-w-[110px]">买入净值</th>
                         <th @click="toggleSort('principal')" class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[120px] cursor-pointer select-none hover:text-slate-700" title="点击按投入本金排序">投入本金<span class="ml-1 text-[9px]" :class="sortKey === 'principal' ? 'text-indigo-600' : 'text-slate-300'">{{ sortKey === 'principal' ? (sortDir === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
@@ -1000,6 +1006,8 @@ createApp({
         const filterType = ref('全部类别');
         const filterStatus = ref('全部状态');
         const searchQuery = ref('');
+        const codeFilter = ref('');
+        const nameFilter = ref('');
 
         const modalOpen = ref(false);
         const isCopyMode = ref(false);
@@ -1234,7 +1242,11 @@ createApp({
                 const q = searchQuery.value.trim().toLowerCase();
                 const matchQuery = !q || item.code.toLowerCase().includes(q) ||
                                    item.name.toLowerCase().includes(q);
-                return matchType && matchStatus && matchQuery;
+                const cf = codeFilter.value.trim().toLowerCase();
+                const matchCode = !cf || String(item.code || '').toLowerCase().includes(cf);
+                const nf = nameFilter.value.trim().toLowerCase();
+                const matchName = !nf || String(item.name || '').toLowerCase().includes(nf);
+                return matchType && matchStatus && matchQuery && matchCode && matchName;
             });
             if (!sortKey.value) return list;
             const key = sortKey.value;
@@ -2461,6 +2473,8 @@ ${JSON.stringify(items.value.map(i => ({
             filterType,
             filterStatus,
             searchQuery,
+            codeFilter,
+            nameFilter,
             sortKey,
             sortDir,
             toggleSort,

@@ -25,6 +25,8 @@
         // 仅当页面可见且距上次同步超过 idlePullInterval 时才真正请求。
         checkInterval: 60000,    // 检查间隔
         idlePullInterval: 900000,// 空闲时最小拉取间隔（15 分钟）
+        idleOfflineMs: 3600000,  // 无任何用户操作超过该时长自动离线（1 小时），停止一切扫描与网络请求
+        idleCheckMs: 30000,      // 空闲检测定时器间隔（纯本地计时，不产生网络请求）
         maxDailyCalls: 200,      // 每日网络请求熔断上限（约 2 点/天），防止异常循环烧穿额度
         batchSize: 500,          // 单批 upsert 条数
         tombstoneTTL: 90 * 24 * 3600 * 1000,
@@ -41,6 +43,7 @@
     var app = null, auth = null, db = null;
     var session = null, userEmail = '';
     var started = false, syncing = false, online = true;
+    var idleOffline = false, lastActivityAt = 0, idleTimer = null, activityBound = false;
     var adapters = {};          // module -> adapter
     var moduleOrder = [];
     var pushTimers = {};
@@ -437,6 +440,7 @@
             email: userEmail,
             syncing: syncing,
             online: online,
+            idleOffline: idleOffline,
             lastSyncAt: lastSyncAt,
             lastError: lastError ? String(lastError.message || lastError) : null,
             pendingRemoteDeletes: countRemoteDeletes(),
@@ -470,10 +474,11 @@
         } catch (e) { /* 未登录 */ }
 
         auth.onAuthStateChange(function (event, s) {
-            if (event === 'SIGNED_OUT') { session = null; userEmail = ''; }
+            if (event === 'SIGNED_OUT') { session = null; userEmail = ''; idleOffline = false; }
             else if (s) {
                 session = s;
                 userEmail = (s.user && (s.user.email || s.user.phone)) || '';
+                if (idleOffline) goOnline();
             }
             emitStatus(); renderUI();
         });
@@ -489,15 +494,15 @@
         // 注意：这里只是"检查"定时器，绝不无条件发包。
         // 后台标签页 + 空闲退避双重拦截，避免空耗按次计费的网关额度。
         pullTimer = setInterval(function () {
-            if (document.hidden) return;
+            if (idleOffline || document.hidden) return;
             if (now() - lastSyncAt < CONFIG.idlePullInterval) return;
             syncAll(true);
         }, CONFIG.checkInterval);
 
         document.addEventListener('visibilitychange', function () {
-            if (!document.hidden && session) syncAll();
+            if (!document.hidden && session && !idleOffline) syncAll();
         });
-        global.addEventListener('online', function () { online = true; syncAll(); });
+        global.addEventListener('online', function () { online = true; if (!idleOffline) syncAll(); });
         global.addEventListener('offline', function () { online = false; emitStatus(); renderUI(); });
 
         if (session) {
@@ -819,7 +824,7 @@
     function scheduleScan() {
         clearInterval(scanTimer);
         scanTimer = setInterval(function () {
-            if (!session || document.hidden || syncing) return;
+            if (!session || document.hidden || syncing || idleOffline) return;
             moduleOrder.forEach(function (m) {
                 var ad = adapters[m];
                 if (!ad) return;
@@ -831,6 +836,60 @@
                 } catch (e) { /* 忽略单模块扫描异常 */ }
             });
         }, CONFIG.scanInterval);
+    }
+
+    // ---------- 闲置自动离线（节省云端资源）----------
+    // 场景：页面长时间挂起（无任何用户操作）仍会周期性拉取/推送，持续消耗按次计费的云端资源。
+    // 策略：超过 idleOfflineMs（默认 1 小时）无操作 → 自动"离线"：停止本地变更扫描与所有网络定时器；
+    //       页面顶部提示已离线，用户点击"重新在线"后恢复同步（先推送本地改动、再拉取云端）。
+    var ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll', 'input', 'click'];
+
+    function bindActivity() {
+        if (activityBound) return;
+        activityBound = true;
+        var pending = false;
+        var touch = function () {
+            if (pending) return;
+            pending = true;
+            lastActivityAt = now();
+            setTimeout(function () { pending = false; }, 5000);   // 最多每 5 秒刷新一次，避免高频事件开销
+        };
+        ACTIVITY_EVENTS.forEach(function (ev) {
+            global.addEventListener(ev, touch, { passive: true, capture: true });
+        });
+    }
+
+    function watchIdle() {
+        if (idleOffline || !session) return;
+        if (!lastActivityAt) { lastActivityAt = now(); return; }
+        if (now() - lastActivityAt >= CONFIG.idleOfflineMs) goIdleOffline();
+    }
+
+    function goIdleOffline() {
+        if (idleOffline) return;
+        idleOffline = true;
+        // 停止一切后台活动：本地扫描 + 网络检查定时器 + 待推送防抖
+        clearInterval(scanTimer); scanTimer = null;
+        clearInterval(pullTimer); pullTimer = null;
+        for (var k in pushTimers) { clearTimeout(pushTimers[k]); pushTimers[k] = null; }
+        console.info('[CloudSync] 已闲置超时，自动离线以节省云端资源');
+        emitStatus(); renderUI();
+    }
+
+    async function goOnline() {
+        lastActivityAt = now();
+        if (!idleOffline) return;
+        idleOffline = false;
+        if (started) scheduleScan();
+        clearInterval(pullTimer);
+        pullTimer = setInterval(function () {
+            if (idleOffline || document.hidden) return;
+            if (now() - lastSyncAt < CONFIG.idlePullInterval) return;
+            syncAll(true);
+        }, CONFIG.checkInterval);
+        emitStatus(); renderUI();
+        // 重新在线：先把本地现有数据推送上去，再拉取云端（force 放行后台拦截）
+        try { await syncAll(false, true); } catch (e) { }
     }
 
     // ---------- 登录 ----------
@@ -858,16 +917,18 @@
     async function signOut() {
         try { if (auth) await auth.signOut(); } catch (e) { }
         session = null; userEmail = '';
+        idleOffline = false;
         uiDeleted = null; uiDeletedBusy = false; uiRemote = null;
         emitStatus(); renderUI();
     }
 
     // ---------- UI ----------
-    var uiBuilt = false, uiRoot = null, uiBadge = null, uiPanel = null;
+    var uiBuilt = false, uiRoot = null, uiBadge = null, uiPanel = null, uiOffline = null;
 
     function statusMeta() {
         if (!started || !global.cloudbase) return { color: '#94a3b8', text: '未就绪' };
         if (!session) return { color: '#f59e0b', text: '未登录' };
+        if (idleOffline) return { color: '#94a3b8', text: '已离线' };
         if (!online) return { color: '#94a3b8', text: '离线' };
         if (syncing) return { color: '#3b82f6', text: '同步中' };
         if (lastError) return { color: '#ef4444', text: '同步失败' };
@@ -910,7 +971,19 @@
             '.__cbsync_item{padding:8px 0;border-bottom:1px solid #f1f5f9;}' +
             '.__cbsync_item_m{font-size:10px;color:#94a3b8;}' +
             '.__cbsync_item_t{font-size:12px;color:#1e293b;margin:2px 0 4px;word-break:break-all;}' +
-            '.__cbsync_item button{margin-bottom:0;padding:4px;}';
+            '.__cbsync_item button{margin-bottom:0;padding:4px;}' +
+            '#__cbsync_offline{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483001;display:none;' +
+            'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}' +
+            '#__cbsync_offline.show{display:block;}' +
+            '#__cbsync_offline_card{display:flex;align-items:center;gap:12px;background:#fff;' +
+            'border:1px solid rgba(15,23,42,.10);border-left:4px solid #94a3b8;border-radius:12px;' +
+            'box-shadow:0 12px 32px rgba(15,23,42,.20);padding:12px 16px;color:#1e293b;max-width:92vw;}' +
+            '#__cbsync_offline_title{font-weight:700;font-size:13px;color:#0f172a;white-space:nowrap;}' +
+            '#__cbsync_offline_desc{font-size:12px;color:#64748b;}' +
+            '#__cbsync_offline_btn{border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;' +
+            'font-size:12px;padding:8px 14px;cursor:pointer;white-space:nowrap;}' +
+            '#__cbsync_offline_btn:hover{background:#1d4ed8;}' +
+            '#__cbsync_offline_btn:disabled{opacity:.6;cursor:default;}';
         document.head.appendChild(style);
     }
 
@@ -937,6 +1010,27 @@
         uiRoot.appendChild(uiPanel);
         uiRoot.appendChild(uiBadge);
         document.body.appendChild(uiRoot);
+
+        // 顶部"已自动离线"提示条
+        uiOffline = document.createElement('div');
+        uiOffline.id = '__cbsync_offline';
+        var hours = Math.round(CONFIG.idleOfflineMs / 3600000);
+        uiOffline.innerHTML =
+            '<div id="__cbsync_offline_card">' +
+            '<div>' +
+            '<div id="__cbsync_offline_title">已自动离线</div>' +
+            '<div id="__cbsync_offline_desc">超过 ' + hours + ' 小时无操作，已暂停云端同步以节省资源。</div>' +
+            '</div>' +
+            '<button id="__cbsync_offline_btn">重新在线并上传数据</button>' +
+            '</div>';
+        document.body.appendChild(uiOffline);
+        var offlineBtn = document.getElementById('__cbsync_offline_btn');
+        if (offlineBtn) offlineBtn.onclick = function () {
+            offlineBtn.disabled = true; offlineBtn.textContent = '重新上线中…';
+            Promise.resolve(goOnline()).then(function () {
+                offlineBtn.disabled = false; offlineBtn.textContent = '重新在线并上传数据';
+            });
+        };
     }
 
     var step = 'signin';   // signin | code
@@ -1088,7 +1182,8 @@
         const btnNow = document.getElementById('__cbsync_now');
         if (btnNow) btnNow.onclick = async function () {
             btnNow.disabled = true; btnNow.textContent = '同步中…';
-            await syncAll(false, true);
+            if (idleOffline) await goOnline();
+            else await syncAll(false, true);
             renderPanel();
             msg('同步完成', 'ok');
         };
@@ -1208,11 +1303,16 @@
         if (dot) dot.style.background = st.color;
         if (txt) txt.textContent = st.text;
         uiBadge.classList.toggle('busy', st.text === '同步中');
+        if (uiOffline) uiOffline.classList.toggle('show', idleOffline);
         if (uiPanel && uiPanel.classList.contains('open')) updateStat();
     }
 
     // ---------- 启动 ----------
     function boot() {
+        bindActivity();
+        lastActivityAt = now();
+        clearInterval(idleTimer);
+        idleTimer = setInterval(watchIdle, CONFIG.idleCheckMs);
         start();
         renderUI();
     }
@@ -1237,6 +1337,8 @@
         backupStamp: backupStamp,
         serverNow: serverNow,
         start: start,
+        resume: goOnline,
+        isIdleOffline: function () { return idleOffline; },
         sync: function (m) { return m ? syncModule(m) : syncAll(); },
         // 云端函数代理：供业务模块调用 CloudBase 云函数（如场外基金净值代理）。
         // 复用本模块已初始化的 app 实例，无需业务代码自行 init。

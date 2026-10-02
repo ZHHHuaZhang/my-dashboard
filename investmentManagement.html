@@ -1372,12 +1372,11 @@ createApp({
         const openModal = (item = null, copy = false) => {
             if (item) {
                 if (copy) {
-                    // 复制新增（分批买入）：保留代码/名称/类别/分红/计划加仓/最新价等重复参数，清空本次买入相关字段
+                    // 复制新增（分批买入）：保留代码/名称/类别/买入日期/分红/计划加仓/最新价等重复参数，仅清空本次买入的净值/本金/份额等字段
                     const today = new Date().toISOString().split('T')[0];
                     editingItem.value = {};
                     form.value = {
                         ...item,
-                        buyDate: today,
                         buyNav: null,
                         principal: null,
                         buyFee: 0,

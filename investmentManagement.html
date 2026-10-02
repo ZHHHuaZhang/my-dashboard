@@ -249,7 +249,7 @@
                         <th class="px-2 py-3 sm:p-4 text-center min-w-[80px] sm:min-w-[100px]">状态</th>
                         <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[110px]">计划加仓</th>
                         <th class="px-2 py-3 sm:p-4 text-right min-w-[90px] sm:min-w-[110px]">清仓后涨跌</th>
-                        <th class="p-4 pr-6 text-center min-w-[120px]">操作</th>
+                        <th class="p-4 pr-6 text-center min-w-[120px] sticky right-0 z-20 bg-slate-50 border-l border-slate-200 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">操作</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
@@ -260,7 +260,7 @@
                         </td>
                     </tr>
                     <tr v-for="item in filteredItems" :key="item.id" 
-                        class="hover:bg-slate-50/80 transition">
+                        class="group hover:bg-slate-50/80 transition">
                             <!-- 代码/名称/类别 -->
                             <td class="p-4 pl-6">
                                 <div class="font-bold text-slate-900 text-sm">{{ item.name }}</div>
@@ -393,7 +393,7 @@
                             </td>
 
                             <!-- 操作按键 -->
-                            <td class="p-4 pr-6 text-center">
+                            <td class="p-4 pr-6 text-center sticky right-0 z-10 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">
                                 <div class="flex items-center justify-center space-x-2">
                                     <button @click="openModal(item)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="编辑记录">
                                         <i data-lucide="edit-2" class="w-4 h-4"></i>

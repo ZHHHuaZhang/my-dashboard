@@ -787,27 +787,55 @@
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-[11px] text-slate-400 mb-1">标的</label>
-                    <select id="buy-asset" class="w-full glass-input rounded-lg py-2 text-xs"></select>
+                    <label class="block text-[11px] text-slate-400 mb-1">类目</label>
+                    <select id="buy-category" onchange="onBuyCategoryChange()" class="w-full glass-input rounded-lg py-2 text-xs">
+                        <option value="stock">股票</option>
+                        <option value="fund">基金</option>
+                        <option value="moneyMarket">货基与理财</option>
+                    </select>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">日期</label>
-                        <input type="date" id="buy-date" class="w-full glass-input rounded-lg py-2 text-xs">
+                <div id="buy-equity-fields">
+                    <div class="mb-3">
+                        <label class="block text-[11px] text-slate-400 mb-1">标的</label>
+                        <select id="buy-asset" class="w-full glass-input rounded-lg py-2 text-xs"></select>
                     </div>
-                    <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">股数/份</label>
-                        <input type="number" id="buy-shares" min="0" step="10" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如 100">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">日期</label>
+                            <input type="date" id="buy-date" class="w-full glass-input rounded-lg py-2 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">股数/份</label>
+                            <input type="number" id="buy-shares" min="0" step="10" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如 100">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="block text-[11px] text-slate-400 mb-1">买入价(元)</label>
+                        <input type="number" id="buy-price" min="0" step="0.01" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="可选">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-[11px] text-slate-400 mb-1">买入价(元)</label>
-                    <input type="number" id="buy-price" min="0" step="0.01" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="可选">
+                <div id="buy-mm-fields" class="hidden">
+                    <div class="mb-3">
+                        <label class="block text-[11px] text-slate-400 mb-1">产品</label>
+                        <select id="buy-mm-product" class="w-full glass-input rounded-lg py-2 text-xs"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">日期</label>
+                            <input type="date" id="buy-mm-date" class="w-full glass-input rounded-lg py-2 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">金额(元)</label>
+                            <input type="number" id="buy-mm-amount" min="0" step="100" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如 10000">
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-[11px] text-slate-400 mb-1">备注</label>
                     <input type="text" id="buy-note" class="w-full glass-input rounded-lg py-2 text-xs" placeholder="如：分红再投入">
                 </div>
+                <input type="hidden" id="buy-edit-id">
+                <input type="hidden" id="buy-edit-kind">
             </div>
             <div class="flex gap-2 justify-end mt-5 text-xs">
                 <button onclick="closeBuyModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-lg">取消</button>
@@ -847,10 +875,10 @@
             principal: 0,
             apy: 1.8,
             products: [
-                { name: "余额宝", type: "货币基金", apy: 1.8, amount: 0 },
-                { name: "微信零钱通", type: "货币基金", apy: 1.7, amount: 0 },
-                { name: "支付宝定期理财", type: "固收理财", apy: 3.2, amount: 0 },
-                { name: "银行定期理财", type: "定期理财", apy: 4.0, amount: 0 }
+                { id: "mm_yeb", name: "余额宝", type: "货币基金", apy: 1.8, amount: 0 },
+                { id: "mm_lqt", name: "微信零钱通", type: "货币基金", apy: 1.7, amount: 0 },
+                { id: "mm_zfb", name: "支付宝定期理财", type: "固收理财", apy: 3.2, amount: 0 },
+                { id: "mm_bank", name: "银行定期理财", type: "定期理财", apy: 4.0, amount: 0 }
             ]
         };
 
@@ -862,6 +890,7 @@
             moneyMarket: { ...INITIAL_MONEY_MARKET },
             lots: [],          // 买入记账流水: {id, assetId, date, shares, price, note}
             divEvents: [],     // 分红率调整记账: {id, assetId, date, dividend, note}
+            mmLots: [],        // 货基/理财买入流水: {id, productId, date, amount, note}
             resolution: "",
             giteeToken: "",
             giteeUser: "",
@@ -906,7 +935,11 @@
                     // Standard migration safety checks
                     if (parsed.stocks) state.stocks = parsed.stocks;
                     if (parsed.funds) state.funds = parsed.funds;
-                    if (parsed.moneyMarket) state.moneyMarket = parsed.moneyMarket;
+                    if (parsed.moneyMarket) {
+                        state.moneyMarket = parsed.moneyMarket;
+                        if (state.moneyMarket.products) state.moneyMarket.products.forEach((p, i) => { if (!p.id) p.id = 'mm_seed_' + i; });
+                    }
+                    if (parsed.mmLots) state.mmLots = parsed.mmLots;
                     if (parsed.target) state.target = parsed.target;
                     if (parsed.dailyCost) state.dailyCost = parsed.dailyCost;
                     if (parsed.resolution) state.resolution = parsed.resolution;
@@ -916,6 +949,7 @@
                     // 记账式流水（兼容旧备份：无 lots/divEvents 时从现有持仓迁移）
                     if (parsed.lots) state.lots = parsed.lots;
                     if (parsed.divEvents) state.divEvents = parsed.divEvents;
+                    if (!state.mmLots) state.mmLots = [];
                     if (!parsed.lots && (parsed.stocks || parsed.funds)) {
                         state.lots = [];
                         const seedDate = new Date().toISOString().slice(0, 10);
@@ -1126,6 +1160,33 @@
             state.lots = (state.lots || []).filter(l => l.id !== lotId);
             saveStateToLocal();
         }
+        function updateLot(lotId, fields) {
+            const l = (state.lots || []).find(x => x.id === lotId);
+            if (!l) return;
+            if (fields.date !== undefined) l.date = fields.date;
+            if (fields.shares !== undefined) l.shares = Number(fields.shares) || 0;
+            if (fields.price !== undefined) l.price = Number(fields.price) || 0;
+            if (fields.note !== undefined) l.note = fields.note;
+            saveStateToLocal();
+        }
+        function getMMLots(productId) { return (state.mmLots || []).filter(l => l.productId === productId); }
+        function addMMLot(productId, date, amount, note) {
+            if (!state.mmLots) state.mmLots = [];
+            state.mmLots.push({ id: 'mml_' + Date.now() + Math.random().toString(36).slice(2, 6), productId, date, amount: Number(amount) || 0, note: note || '' });
+            saveStateToLocal();
+        }
+        function updateMMLot(lotId, fields) {
+            const l = (state.mmLots || []).find(x => x.id === lotId);
+            if (!l) return;
+            if (fields.date !== undefined) l.date = fields.date;
+            if (fields.amount !== undefined) l.amount = Number(fields.amount) || 0;
+            if (fields.note !== undefined) l.note = fields.note;
+            saveStateToLocal();
+        }
+        function removeMMLot(lotId) {
+            state.mmLots = (state.mmLots || []).filter(l => l.id !== lotId);
+            saveStateToLocal();
+        }
         function removeDivEvent(deId) {
             state.divEvents = (state.divEvents || []).filter(d => d.id !== deId);
             saveStateToLocal();
@@ -1160,20 +1221,27 @@
         // 股息增长轨迹图表（由每笔买入/分红调整推导）
         let growthChartInstance = null;
         let growthMonthlyInstance = null;
-        function computeMMAnnual() {
+        function computeMMAnnual(refDate) {
             let mm = 0;
             const prods = (state.moneyMarket && state.moneyMarket.products) || [];
             prods.forEach(p => { mm += (Number(p.amount) || 0) * (Number(p.apy) || 0) / 100; });
+            // 货基/理财买入流水（按日期累计）
+            (state.mmLots || []).forEach(l => {
+                if (refDate && l.date > refDate) return;
+                const prod = prods.find(p => p.id === l.productId);
+                const apy = prod ? (Number(prod.apy) || 0) : 0;
+                mm += (Number(l.amount) || 0) * apy / 100;
+            });
             return mm;
         }
         function renderGrowthChart() {
             const canvas = document.getElementById('growth-chart');
             if (!canvas || typeof Chart === 'undefined') return;
             const assets = state.stocks.concat(state.funds);
-            const mmAnnual = computeMMAnnual();
             const allDates = [];
             (state.lots || []).forEach(l => l.date && allDates.push(l.date));
             (state.divEvents || []).forEach(d => d.date && allDates.push(d.date));
+            (state.mmLots || []).forEach(l => l.date && allDates.push(l.date));
             allDates.sort();
 
             const labels = [], totals = [];
@@ -1184,7 +1252,7 @@
                 while (cur <= last) {
                     const y = cur.getFullYear(), m = cur.getMonth();
                     const ref = `${y}-${String(m + 1).padStart(2, '0')}-15`;
-                    let t = mmAnnual;
+                    let t = computeMMAnnual(ref);
                     assets.forEach(a => { t += getDerivedSharesAsOf(a.id, ref) * getDerivedDividendAsOf(a.id, ref); });
                     labels.push(`${y}-${String(m + 1).padStart(2, '0')}`);
                     totals.push(Number(t.toFixed(2)));
@@ -1204,7 +1272,7 @@
 
             const fmt = v => '¥' + Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
-            setEl('growth-current', fmt(totals.length ? totals[totals.length - 1] : mmAnnual));
+            setEl('growth-current', fmt(totals.length ? totals[totals.length - 1] : computeMMAnnual(todayStr())));
             setEl('growth-since', (totals.length && totals[totals.length - 1] - totals[0] >= 0 ? '+' : '') + fmt(totals.length ? totals[totals.length - 1] - totals[0] : 0));
             setEl('growth-buy', fmt(buyContrib));
             setEl('growth-div', fmt(divContrib));
@@ -1272,12 +1340,6 @@
         }
 
         // ===================== 记账式弹窗交互 =====================
-        function populateAssetSelect(selId) {
-            const sel = document.getElementById(selId);
-            if (!sel) return;
-            sel.innerHTML = state.stocks.concat(state.funds)
-                .map(a => `<option value="${a.id}">${a.name}${a.code ? ' (' + a.code + ')' : ''}</option>`).join('');
-        }
         function openModalHelper(id) {
             const m = document.getElementById(id);
             m.classList.remove('hidden');
@@ -1288,57 +1350,165 @@
             m.classList.remove('opacity-100');
             setTimeout(() => m.classList.add('hidden'), 300);
         }
-        function openBuyModal(presetId) {
+        function populateAssetSelect(selId) {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            sel.innerHTML = state.stocks.concat(state.funds)
+                .map(a => `<option value="${a.id}">${a.name}${a.code ? ' (' + a.code + ')' : ''}</option>`).join('');
+        }
+        function populateMMSelect(selId) {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            const prods = (state.moneyMarket && state.moneyMarket.products) || [];
+            sel.innerHTML = prods.length
+                ? prods.map(p => `<option value="${p.id}">${p.name}（${p.type} · 年化${p.apy}%）</option>`).join('')
+                : `<option value="">（货基与理财页先添加产品）</option>`;
+        }
+        function onBuyCategoryChange() {
+            const cat = document.getElementById('buy-category').value;
+            const isMM = cat === 'moneyMarket';
+            document.getElementById('buy-equity-fields').classList.toggle('hidden', isMM);
+            document.getElementById('buy-mm-fields').classList.toggle('hidden', !isMM);
+            if (isMM) populateMMSelect('buy-mm-product');
+        }
+        function openBuyModal(presetId, lotId) {
+            document.getElementById('buy-edit-id').value = lotId || '';
+            document.getElementById('buy-edit-kind').value = 'equity';
             populateAssetSelect('buy-asset');
-            if (presetId) document.getElementById('buy-asset').value = presetId;
-            document.getElementById('buy-date').value = todayStr();
-            document.getElementById('buy-shares').value = '';
-            document.getElementById('buy-price').value = '';
+            let cat = 'stock';
+            if (presetId) {
+                const a = findAssetById(presetId);
+                cat = a && a.type === 'fund' ? 'fund' : 'stock';
+                document.getElementById('buy-asset').value = presetId;
+            }
+            document.getElementById('buy-category').value = cat;
+            onBuyCategoryChange();
+            if (lotId) {
+                const l = (state.lots || []).find(x => x.id === lotId);
+                if (l) {
+                    document.getElementById('buy-date').value = l.date;
+                    document.getElementById('buy-shares').value = l.shares;
+                    document.getElementById('buy-price').value = l.price || '';
+                }
+            } else {
+                document.getElementById('buy-date').value = todayStr();
+                document.getElementById('buy-shares').value = '';
+                document.getElementById('buy-price').value = '';
+            }
+            document.getElementById('buy-note').value = '';
+            openModalHelper('buy-modal');
+        }
+        function openMMBuyModal(productId, lotId) {
+            document.getElementById('buy-edit-id').value = lotId || '';
+            document.getElementById('buy-edit-kind').value = 'mm';
+            document.getElementById('buy-category').value = 'moneyMarket';
+            onBuyCategoryChange();
+            populateMMSelect('buy-mm-product');
+            if (productId) document.getElementById('buy-mm-product').value = productId;
+            if (lotId) {
+                const l = (state.mmLots || []).find(x => x.id === lotId);
+                if (l) {
+                    document.getElementById('buy-mm-date').value = l.date;
+                    document.getElementById('buy-mm-amount').value = l.amount;
+                }
+            } else {
+                document.getElementById('buy-mm-date').value = todayStr();
+                document.getElementById('buy-mm-amount').value = '';
+            }
             document.getElementById('buy-note').value = '';
             openModalHelper('buy-modal');
         }
         function closeBuyModal() { closeModalHelper('buy-modal'); }
         function submitBuy() {
-            const assetId = document.getElementById('buy-asset').value;
-            const date = document.getElementById('buy-date').value || todayStr();
-            const shares = parseFloat(document.getElementById('buy-shares').value) || 0;
-            const price = parseFloat(document.getElementById('buy-price').value) || 0;
+            const cat = document.getElementById('buy-category').value;
             const note = document.getElementById('buy-note').value.trim();
-            if (!assetId) { showToast('请选择标的', 'warning'); return; }
-            if (shares === 0) { showToast('股数不能为 0', 'warning'); return; }
-            addLot(assetId, date, shares, price, note);
-            calculateDividends();
-            closeBuyModal();
-            showToast(`已登记买入 ${shares} 股（${date}）`, 'success');
+            const editId = document.getElementById('buy-edit-id').value;
+            const editKind = document.getElementById('buy-edit-kind').value;
+            if (cat === 'moneyMarket') {
+                const productId = document.getElementById('buy-mm-product').value;
+                const date = document.getElementById('buy-mm-date').value || todayStr();
+                const amount = parseFloat(document.getElementById('buy-mm-amount').value) || 0;
+                if (!productId) { showToast('请先在货基与理财页添加产品', 'warning'); return; }
+                if (amount === 0) { showToast('金额不能为 0', 'warning'); return; }
+                if (editId && editKind === 'mm') { updateMMLot(editId, { date, amount, note }); }
+                else { addMMLot(productId, date, amount, note); }
+                calculateDividends();
+                if (currentHistoryScope) renderHistoryModal();
+                closeBuyModal();
+                showToast(editId ? `已更新货基买入 ¥${amount}（${date}）` : `已登记货基买入 ¥${amount}（${date}）`, 'success');
+            } else {
+                const assetId = document.getElementById('buy-asset').value;
+                const date = document.getElementById('buy-date').value || todayStr();
+                const shares = parseFloat(document.getElementById('buy-shares').value) || 0;
+                const price = parseFloat(document.getElementById('buy-price').value) || 0;
+                if (!assetId) { showToast('请选择标的', 'warning'); return; }
+                if (shares === 0) { showToast('股数不能为 0', 'warning'); return; }
+                if (editId && editKind === 'equity') { updateLot(editId, { date, shares, price, note }); }
+                else { addLot(assetId, date, shares, price, note); }
+                calculateDividends();
+                if (currentHistoryScope) renderHistoryModal();
+                closeBuyModal();
+                showToast(editId ? `已更新买入 ${shares} 股（${date}）` : `已登记买入 ${shares} 股（${date}）`, 'success');
+            }
         }
+        let currentHistoryScope = null;
         function openHistoryModal(assetId) {
             const a = findAssetById(assetId);
+            currentHistoryScope = { kind: 'equity', id: assetId };
             document.getElementById('history-title').innerText = `${a ? a.name : '标的'} · 买入流水`;
-            renderHistoryList(assetId);
+            renderHistoryModal();
+            openModalHelper('history-modal');
+        }
+        function openMMHistoryModal(productId) {
+            const p = (state.moneyMarket.products || []).find(x => x.id === productId);
+            currentHistoryScope = { kind: 'mm', id: productId };
+            document.getElementById('history-title').innerText = `${p ? p.name : '产品'} · 货基买入流水`;
+            renderHistoryModal();
             openModalHelper('history-modal');
         }
         function closeHistoryModal() { closeModalHelper('history-modal'); }
-        function renderHistoryList(assetId) {
+        function renderHistoryModal() {
             const list = document.getElementById('history-list');
-            if (!list) return;
-            const lots = getAssetLots(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
-            const divs = getAssetDivEvents(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
-            let html = `<div class="text-slate-400 font-semibold mb-1">买入记录</div>`;
-            html += lots.length ? '' : `<div class="text-slate-500">暂无</div>`;
-            lots.forEach(l => {
-                html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
-                    <div class="min-w-0"><span class="text-slate-300">${l.date}</span> <span class="text-sky-400 font-mono">${l.shares > 0 ? '+' : ''}${l.shares} 股</span> ${l.price ? `<span class="text-slate-500">@¥${l.price}</span>` : ''} ${l.note ? `<span class="text-slate-500">· ${l.note}</span>` : ''}</div>
-                    <button onclick="removeLot('${l.id}'); renderHistoryList('${assetId}'); calculateDividends();" class="text-rose-400 hover:text-rose-300 ml-2 shrink-0">删除</button>
-                </div>`;
-            });
-            html += `<div class="text-slate-400 font-semibold mt-3 mb-1">分红调整记录</div>`;
-            html += divs.length ? '' : `<div class="text-slate-500">暂无</div>`;
-            divs.forEach(d => {
-                html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
-                    <div class="min-w-0"><span class="text-slate-300">${d.date}</span> <span class="text-emerald-400 font-mono">每股 ¥${d.dividend}</span> ${d.note ? `<span class="text-slate-500">· ${d.note}</span>` : ''}</div>
-                    <button onclick="removeDivEvent('${d.id}'); renderHistoryList('${assetId}'); calculateDividends();" class="text-rose-400 hover:text-rose-300 ml-2 shrink-0">删除</button>
-                </div>`;
-            });
+            if (!list || !currentHistoryScope) return;
+            let html = '';
+            if (currentHistoryScope.kind === 'equity') {
+                const assetId = currentHistoryScope.id;
+                const lots = getAssetLots(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
+                const divs = getAssetDivEvents(assetId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
+                html += `<div class="text-slate-400 font-semibold mb-1">买入记录</div>`;
+                html += lots.length ? '' : `<div class="text-slate-500">暂无</div>`;
+                lots.forEach(l => {
+                    html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
+                        <div class="min-w-0"><span class="text-slate-300">${l.date}</span> <span class="text-sky-400 font-mono">${l.shares > 0 ? '+' : ''}${l.shares} 股</span> ${l.price ? `<span class="text-slate-500">@¥${l.price}</span>` : ''} ${l.note ? `<span class="text-slate-500">· ${l.note}</span>` : ''}</div>
+                        <div class="flex items-center shrink-0 ml-2">
+                            <button onclick="openBuyModal('${assetId}', '${l.id}')" class="text-slate-400 hover:text-sky-300 mr-2" title="编辑"><i class="fa-solid fa-pencil"></i></button>
+                            <button onclick="removeLot('${l.id}'); renderHistoryModal(); calculateDividends();" class="text-rose-400 hover:text-rose-300" title="删除">删除</button>
+                        </div>
+                    </div>`;
+                });
+                html += `<div class="text-slate-400 font-semibold mt-3 mb-1">分红调整记录</div>`;
+                html += divs.length ? '' : `<div class="text-slate-500">暂无</div>`;
+                divs.forEach(d => {
+                    html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
+                        <div class="min-w-0"><span class="text-slate-300">${d.date}</span> <span class="text-emerald-400 font-mono">每股 ¥${d.dividend}</span> ${d.note ? `<span class="text-slate-500">· ${d.note}</span>` : ''}</div>
+                        <button onclick="removeDivEvent('${d.id}'); renderHistoryModal(); calculateDividends();" class="text-rose-400 hover:text-rose-300 ml-2 shrink-0">删除</button>
+                    </div>`;
+                });
+            } else {
+                const productId = currentHistoryScope.id;
+                const lots = getMMLots(productId).slice().sort((x, y) => x.date < y.date ? 1 : -1);
+                html += `<div class="text-slate-400 font-semibold mb-1">货基/理财买入记录</div>`;
+                html += lots.length ? '' : `<div class="text-slate-500">暂无（用顶部「登记买入」选此类目添加）</div>`;
+                lots.forEach(l => {
+                    html += `<div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 rounded-lg p-2">
+                        <div class="min-w-0"><span class="text-slate-300">${l.date}</span> <span class="text-sky-400 font-mono">+¥${Number(l.amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ${l.note ? `<span class="text-slate-500">· ${l.note}</span>` : ''}</div>
+                        <div class="flex items-center shrink-0 ml-2">
+                            <button onclick="openMMBuyModal('${productId}', '${l.id}')" class="text-slate-400 hover:text-sky-300 mr-2" title="编辑"><i class="fa-solid fa-pencil"></i></button>
+                            <button onclick="removeMMLot('${l.id}'); renderHistoryModal(); calculateDividends();" class="text-rose-400 hover:text-rose-300" title="删除">删除</button>
+                        </div>
+                    </div>`;
+                });
+            }
             list.innerHTML = html;
         }
 
@@ -1485,14 +1655,17 @@
                     state.moneyMarket.products.forEach((product, index) => {
                         const row = document.createElement("tr");
                         row.className = "hover:bg-slate-800/30 transition-colors";
-                        row.dataset.index = index;
+                        row.dataset.id = product.id;
                         row.innerHTML = `
                             <td class="py-2 px-2 text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.name}</td>
                             <td class="py-2 px-2 text-center text-slate-400 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.type}</td>
                             <td class="py-2 px-2 text-center text-emerald-400 font-semibold mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.apy}%</td>
                             <td class="py-2 px-2 text-center text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">${product.amount.toFixed(2)}</td>
                             <td class="py-2 px-2 text-right text-slate-300 mm-result">${product.amount > 0 ? '¥' + (product.amount * product.apy / 100).toFixed(2) : '-'}</td>
-                            <td class="py-2 px-2 text-center"><button onclick="removeMMProduct(${index})" class="text-red-400 hover:text-red-300 text-xs">删除</button></td>
+                            <td class="py-2 px-2 text-center flex items-center justify-center gap-2">
+                                <button onclick="openMMHistoryModal('${product.id}')" class="text-slate-500 hover:text-sky-400 transition-colors" title="买入流水"><i class="fa-solid fa-receipt"></i></button>
+                                <button onclick="removeMMProduct('${product.id}')" class="text-red-400 hover:text-red-300 text-xs">删除</button>
+                            </td>
                         `;
                         mmTableBody.appendChild(row);
                     });
@@ -1509,12 +1682,19 @@
                 const apy = parseFloat(cells[2].textContent.replace('%', '')) || 0;
                 const amount = parseFloat(cells[3].textContent) || 0;
                 
-                state.moneyMarket.products.push({ name, type, apy, amount });
+                state.moneyMarket.products.push({ name, type, apy, amount, id: row.dataset.id || ('mm_' + Date.now() + '_' + index) });
                 
                 if (!isNaN(apy) && !isNaN(amount) && amount > 0) {
                     mmTotalPrincipal += amount;
                     mmTotalDividend += amount * apy / 100;
                 }
+            });
+            // 货基/理财买入流水（无日期，计入当前总额）
+            (state.mmLots || []).forEach(l => {
+                const prod = state.moneyMarket.products.find(p => p.id === l.productId);
+                const apy = prod ? (Number(prod.apy) || 0) : 0;
+                mmTotalPrincipal += Number(l.amount) || 0;
+                mmTotalDividend += (Number(l.amount) || 0) * apy / 100;
             });
             state.moneyMarket.principal = mmTotalPrincipal;
             state.moneyMarket.apy = mmTotalPrincipal > 0 ? (mmTotalDividend / mmTotalPrincipal * 100) : 0;
@@ -1695,29 +1875,33 @@
 
         function addMMProduct() {
             // 添加到state
-            const newProduct = { name: "新产品", type: "货币基金", apy: 1.8, amount: 0 };
+            const newProduct = { id: 'mm_' + Date.now().toString(36), name: "新产品", type: "货币基金", apy: 1.8, amount: 0 };
             state.moneyMarket.products.push(newProduct);
             
             // 更新UI
             const tbody = document.getElementById("mm-list-body");
             const row = document.createElement("tr");
             row.className = "hover:bg-slate-800/30 transition-colors";
-            row.dataset.index = state.moneyMarket.products.length - 1;
+            row.dataset.id = newProduct.id;
             row.innerHTML = `
                 <td class="py-2 px-2 text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">新产品</td>
                 <td class="py-2 px-2 text-center text-slate-400 mm-editable" contenteditable="true" onblur="updateMMRow(this)">货币基金</td>
                 <td class="py-2 px-2 text-center text-emerald-400 font-semibold mm-editable" contenteditable="true" onblur="updateMMRow(this)">1.8%</td>
                 <td class="py-2 px-2 text-center text-slate-300 mm-editable" contenteditable="true" onblur="updateMMRow(this)">0</td>
                 <td class="py-2 px-2 text-right text-slate-300 mm-result">-</td>
-                <td class="py-2 px-2 text-center"><button onclick="removeMMProduct(${state.moneyMarket.products.length - 1})" class="text-red-400 hover:text-red-300 text-xs">删除</button></td>
+                <td class="py-2 px-2 text-center flex items-center justify-center gap-2">
+                    <button onclick="openMMHistoryModal('${newProduct.id}')" class="text-slate-500 hover:text-sky-400 transition-colors" title="买入流水"><i class="fa-solid fa-receipt"></i></button>
+                    <button onclick="removeMMProduct('${newProduct.id}')" class="text-red-400 hover:text-red-300 text-xs">删除</button>
+                </td>
             `;
             tbody.appendChild(row);
             saveStateToLocal();
             showToast("已添加新产品，点击单元格即可编辑", "success");
         }
         
-        function removeMMProduct(index) {
-            state.moneyMarket.products.splice(index, 1);
+        function removeMMProduct(id) {
+            state.moneyMarket.products = state.moneyMarket.products.filter(p => p.id !== id);
+            state.mmLots = (state.mmLots || []).filter(l => l.productId !== id);
             calculateDividends();
             showToast("产品已删除", "info");
         }

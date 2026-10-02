@@ -434,15 +434,18 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h3 class="text-lg font-bold text-slate-900">分类统计报表</h3>
-                        <p class="text-xs text-slate-500">按月份与分类维度查看支出/收入结构</p>
+                        <p class="text-xs text-slate-500">按月份与分类维度查看支出/收入结构（下方日历与每周看板同步联动）</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <select id="report-month" onchange="renderReports()" class="text-xs border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-emerald-500 p-2">
-                            <option value="all">全部月份累计</option>
-                        </select>
-                        <select id="report-type" onchange="renderReports()" class="text-xs border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-emerald-500 p-2">
+                        <div class="flex items-center border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                            <button type="button" onclick="calendarPrevMonth()" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white transition" title="上一月"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span id="calendar-month-label" class="text-xs font-semibold text-slate-800 w-24 text-center"></span>
+                            <button type="button" onclick="calendarNextMonth()" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white transition" title="下一月"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                        <select id="calendar-type" onchange="renderReports(); renderCalendar(); renderWeekly();" class="text-xs border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-emerald-500 p-2">
                             <option value="expense">支出</option>
                             <option value="income">收入</option>
+                            <option value="net">净额</option>
                         </select>
                     </div>
                 </div>
@@ -450,21 +453,9 @@
 
             <!-- 每日花费日历看板 -->
             <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">每日花费日历</h3>
-                        <p class="text-xs text-slate-500">以月份为维度，查看每一天的花销热力</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="calendarPrevMonth()" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition"><i class="fa-solid fa-chevron-left"></i></button>
-                        <span id="calendar-month-label" class="text-sm font-semibold text-slate-800 w-24 text-center"></span>
-                        <button type="button" onclick="calendarNextMonth()" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition"><i class="fa-solid fa-chevron-right"></i></button>
-                        <select id="calendar-type" onchange="renderCalendar()" class="text-xs border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-emerald-500 p-2">
-                            <option value="expense">支出</option>
-                            <option value="income">收入</option>
-                            <option value="net">净额</option>
-                        </select>
-                    </div>
+                <div class="mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">每日花费日历</h3>
+                    <p class="text-xs text-slate-500">以月份为维度，查看每一天的收入/支出热力（月份与类型由上方统一控制）</p>
                 </div>
                 <div class="grid grid-cols-7 gap-1.5 text-center text-[11px] text-slate-400 mb-1.5 font-medium">
                     <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
@@ -481,12 +472,12 @@
                 </div>
             </div>
 
-            <!-- 每周花费看板 -->
+            <!-- 每周收支看板 -->
             <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-1">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-900">每周花费</h3>
-                        <p class="text-xs text-slate-500">按周一至周日拆分，统计每周花销（与上方日历共用同一月份）</p>
+                        <h3 class="text-lg font-bold text-slate-900">每周收支</h3>
+                        <p class="text-xs text-slate-500">按周一至周日拆分，统计每周收入 / 支出 / 净额（月份与类型由上方统一控制）</p>
                     </div>
                 </div>
                 <div id="weekly-summary" class="text-xs text-slate-500 mb-3"></div>
@@ -663,6 +654,7 @@
 
                 <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 sticky bottom-0 bg-white pb-safe">
                     <button type="button" onclick="closeRecordModal()" class="w-full sm:w-auto px-4 py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200">取消</button>
+                    <button type="button" onclick="saveRecord(true)" class="w-full sm:w-auto px-4 py-3 bg-white border border-emerald-500 text-emerald-600 rounded-xl text-sm font-semibold hover:bg-emerald-50">保存并再记一笔</button>
                     <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm">保存</button>
                 </div>
             </form>
@@ -1125,13 +1117,6 @@
             monthSel.innerHTML = '<option value="all">全部月份</option>' +
                 months.map(m => `<option value="${m}">${m}</option>`).join('');
         }
-        const reportMonthSel = document.getElementById('report-month');
-        if (reportMonthSel) {
-            const months = [...new Set(transactions.map(t => getMonthKey(t.date)))].sort().reverse();
-            reportMonthSel.innerHTML = '<option value="all">全部月份累计</option>' +
-                months.map(m => `<option value="${m}">${m}</option>`).join('');
-        }
-
         const catSel = document.getElementById('filter-category');
         if (catSel) {
             const allCats = [
@@ -1403,14 +1388,24 @@
         updateCategoryDropdowns();
     }
 
-    function openRecordModal(tx = null) {
+    // 新记录默认日期：记住上一次用过的日期，避免每次都从"今天"开始反复调整
+    const LAST_DATE_KEY = 'ledger-last-date';
+    function getDefaultRecordDate() {
+        return localStorage.getItem(LAST_DATE_KEY) || new Date().toISOString().split('T')[0];
+    }
+
+    function openRecordModal(tx = null, copy = false) {
         editingTxId = null;
         if (tx) {
-            editingTxId = tx.id;
-            document.getElementById('modal-title').innerText = '编辑交易';
+            if (copy) {
+                document.getElementById('modal-title').innerText = '复制记一笔';
+            } else {
+                editingTxId = tx.id;
+                document.getElementById('modal-title').innerText = '编辑交易';
+            }
             currentRecordType = tx.type;
             setRecordType(tx.type);
-            document.getElementById('record-amount').value = tx.amount;
+            document.getElementById('record-amount').value = copy ? '' : tx.amount;
             document.getElementById('record-category').value = tx.category;
             document.getElementById('record-account').value = tx.account;
             document.getElementById('record-date').value = tx.date;
@@ -1420,30 +1415,35 @@
             document.getElementById('modal-title').innerText = '记一笔';
             setRecordType('expense');
             document.getElementById('record-amount').value = '';
-            document.getElementById('record-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('record-date').value = getDefaultRecordDate();
             const now = new Date();
             document.getElementById('record-time').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
             document.getElementById('record-note').value = '';
         }
         document.getElementById('record-modal').classList.remove('hidden');
+        if (copy) {
+            const amt = document.getElementById('record-amount');
+            if (amt) amt.focus();
+        }
     }
 
     function closeRecordModal() {
         document.getElementById('record-modal').classList.add('hidden');
     }
 
-    function handleRecordSubmit(e) {
-        e.preventDefault();
+    // keepOpen=true：保存后保留弹窗，并保留日期/类型/分类/账户，仅清空金额与备注，便于同一天连续记账
+    function saveRecord(keepOpen = false) {
         const amount = parseFloat(document.getElementById('record-amount').value);
         if (!amount || amount <= 0) { showToast('金额必须大于 0', 'error'); return; }
 
+        const dateVal = document.getElementById('record-date').value;
         const tx = {
             id: editingTxId || ('tx-' + Date.now()),
             type: currentRecordType,
             amount,
             category: document.getElementById('record-category').value,
             account: document.getElementById('record-account').value,
-            date: document.getElementById('record-date').value,
+            date: dateVal,
             time: document.getElementById('record-time').value || '12:00',
             note: document.getElementById('record-note').value.trim()
         };
@@ -1456,10 +1456,33 @@
             transactions.push(tx);
             showToast('交易已保存', 'success');
         }
+        if (dateVal) localStorage.setItem(LAST_DATE_KEY, dateVal);
         transactions.sort((a,b) => (a.date + (a.time||'')).localeCompare(b.date + (b.time||'')));
         saveData();
-        closeRecordModal();
         renderAll();
+
+        if (keepOpen) {
+            editingTxId = null;
+            document.getElementById('modal-title').innerText = '记一笔（继续）';
+            document.getElementById('record-amount').value = '';
+            document.getElementById('record-note').value = '';
+            const amt = document.getElementById('record-amount');
+            if (amt) amt.focus();
+        } else {
+            closeRecordModal();
+        }
+    }
+
+    function handleRecordSubmit(e) {
+        e.preventDefault();
+        saveRecord(false);
+    }
+
+    // 复制一笔：以该记录为模板新建（预填类型/分类/账户/日期/时间，金额清空待填）
+    function copyTransaction(id) {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+        openRecordModal(tx, true);
     }
 
     function deleteTransaction(id) {
@@ -1732,8 +1755,9 @@
                 <td class="py-2.5 px-3 text-slate-500">${accName}</td>
                 <td class="py-2.5 px-3 text-slate-500">${t.note || '-'}</td>
                 <td class="py-2.5 px-3 text-right font-bold ${amtClass}">${amt}</td>
-                <td class="py-2.5 px-3 text-center">
+                <td class="py-2.5 px-3 text-center whitespace-nowrap">
                     <button data-id="${t.id}" class="text-blue-500 hover:text-blue-700 mr-2 btn-edit-tx-desk" title="编辑"><i class="fa-solid fa-pen text-xs"></i></button>
+                    <button data-id="${t.id}" class="text-emerald-500 hover:text-emerald-700 mr-2 btn-copy-tx-desk" title="复制一笔"><i class="fa-solid fa-copy text-xs"></i></button>
                     <button data-id="${t.id}" class="text-rose-400 hover:text-rose-600 btn-del-tx-desk" title="删除"><i class="fa-solid fa-trash text-xs"></i></button>
                 </td>
             </tr>`;
@@ -1756,8 +1780,9 @@
                     </div>
                     <div class="text-[11px] text-slate-400 truncate mt-0.5">${t.date}${t.time ? ' · ' + t.time : ''}${t.note ? ' · ' + t.note : ''}</div>
                 </div>
-                <div class="text-right flex-shrink-0">
+                <div class="text-right flex-shrink-0 flex items-center gap-1">
                     <div class="text-base font-bold ${amtClass}">${amt}</div>
+                    <button data-id="${t.id}" class="btn-copy-tx-mob text-slate-300 hover:text-emerald-600 p-1" title="复制一笔"><i class="fa-solid fa-copy text-xs"></i></button>
                 </div>
             </div>`;
         }).join('');
@@ -1769,11 +1794,17 @@
                 if (tx) openRecordModal(tx);
             });
         });
+        tbody.querySelectorAll('.btn-copy-tx-desk').forEach(btn => {
+            btn.addEventListener('click', () => copyTransaction(btn.getAttribute('data-id')));
+        });
         tbody.querySelectorAll('.btn-del-tx-desk').forEach(btn => {
             btn.addEventListener('click', () => {
                 const id = btn.getAttribute('data-id');
                 deleteTransaction(id);
             });
+        });
+        cardsBody.querySelectorAll('.btn-copy-tx-mob').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); copyTransaction(btn.getAttribute('data-id')); });
         });
         cardsBody.querySelectorAll('.record-card').forEach(card => {
             card.addEventListener('click', (e) => {
@@ -1785,34 +1816,50 @@
     }
 
     function renderReports() {
-        const month = document.getElementById('report-month')?.value || 'all';
-        const type = document.getElementById('report-type')?.value || 'expense';
-
-        let filtered = transactions.filter(t => t.type === type);
-        if (month !== 'all') filtered = filtered.filter(t => getMonthKey(t.date) === month);
+        if (!calendarView) {
+            const now = new Date();
+            calendarView = { y: now.getFullYear(), m: now.getMonth() };
+        }
+        const monthKey = `${calendarView.y}-${String(calendarView.m + 1).padStart(2, '0')}`;
+        const type = document.getElementById('calendar-type')?.value || 'expense';
 
         const catMap = {};
-        filtered.forEach(t => {
-            const meta = getCategoryMeta(type, t.category);
+        let count = 0;
+        transactions.forEach(t => {
+            if (getMonthKey(t.date) !== monthKey) return;
+            const amt = Number(t.amount) || 0;
+            if (type === 'net') {
+                if (t.type !== 'income' && t.type !== 'expense') return;
+            } else if (t.type !== type) {
+                return;
+            }
+            const meta = getCategoryMeta(t.type, t.category);
             if (!catMap[meta.name]) catMap[meta.name] = { name: meta.name, icon: meta.icon, value: 0, count: 0 };
-            catMap[meta.name].value += t.amount;
+            catMap[meta.name].value += (type === 'net' && t.type === 'expense') ? -amt : amt;
             catMap[meta.name].count += 1;
+            count += 1;
         });
-        const entries = Object.values(catMap).sort((a,b) => b.value - a.value);
-        const total = entries.reduce((s,e) => s+e.value, 0);
+        const entries = Object.values(catMap).sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+        const total = entries.reduce((s, e) => s + e.value, 0);
+        const denom = entries.reduce((s, e) => s + Math.abs(e.value), 0);
 
         const palette = ['#f43f5e','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+        const typeLabel = type === 'income' ? '收入' : type === 'expense' ? '支出' : '净额';
 
         const barCtx = document.getElementById('reportBarChart').getContext('2d');
         if (reportBarChartInstance) reportBarChartInstance.destroy();
+        const barColors = entries.map(e =>
+            type === 'income' ? 'rgba(16, 185, 129, 0.75)'
+            : type === 'expense' ? 'rgba(244, 63, 94, 0.75)'
+            : e.value >= 0 ? 'rgba(16, 185, 129, 0.75)' : 'rgba(244, 63, 94, 0.75)');
         reportBarChartInstance = new Chart(barCtx, {
             type: 'bar',
             data: {
                 labels: entries.map(e => e.name),
                 datasets: [{
-                    label: type === 'income' ? '收入金额' : '支出金额',
+                    label: typeLabel + '金额',
                     data: entries.map(e => e.value),
-                    backgroundColor: type === 'income' ? 'rgba(16, 185, 129, 0.75)' : 'rgba(244, 63, 94, 0.75)',
+                    backgroundColor: barColors,
                     borderRadius: 6
                 }]
             },
@@ -1839,7 +1886,7 @@
                 type: 'pie',
                 data: {
                     labels: entries.map(e => e.name),
-                    datasets: [{ data: entries.map(e => e.value), backgroundColor: palette.slice(0, entries.length), borderWidth: 2, borderColor: '#fff' }]
+                    datasets: [{ data: entries.map(e => Math.abs(e.value)), backgroundColor: palette.slice(0, entries.length), borderWidth: 2, borderColor: '#fff' }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
@@ -1850,20 +1897,21 @@
 
         const tbody = document.getElementById('report-table-body');
         if (entries.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">暂无数据</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">本月暂无${typeLabel}数据</td></tr>`;
         } else {
-            tbody.innerHTML = entries.map((e,i) => {
-                const pct = total > 0 ? (e.value/total*100) : 0;
+            tbody.innerHTML = entries.map((e, i) => {
+                const pct = denom > 0 ? (Math.abs(e.value) / denom * 100) : 0;
+                const amtCls = type === 'net' ? (e.value >= 0 ? 'text-emerald-600' : 'text-rose-600') : '';
                 return `<tr>
                     <td class="py-3 px-4"><i class="fa-solid ${e.icon} mr-2 text-slate-400"></i>${e.name}</td>
-                    <td class="py-3 px-3 text-right font-bold">${formatCurrency(e.value)}</td>
+                    <td class="py-3 px-3 text-right font-bold ${amtCls}">${formatCurrency(e.value)}</td>
                     <td class="py-3 px-3 text-right text-slate-500">${e.count}</td>
                     <td class="py-3 px-3 text-right">${pct.toFixed(1)}%</td>
-                    <td class="py-3 px-3"><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${palette[i]}"></div></div></td>
+                    <td class="py-3 px-3"><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${palette[i % palette.length]}"></div></div></td>
                 </tr>`;
             }).join('');
         }
-        document.getElementById('report-summary').innerText = `合计 ${formatCurrency(total)} / ${entries.reduce((s,e)=>s+e.count,0)} 笔`;
+        document.getElementById('report-summary').innerText = `合计${typeLabel} ${formatCurrency(total)} / ${count} 笔`;
     }
 
     // ===================== 每日花费日历 =====================
@@ -2001,6 +2049,7 @@
         let { y, m } = calendarView;
         m--; if (m < 0) { m = 11; y--; }
         calendarView = { y, m };
+        renderReports();
         renderCalendar();
         renderWeekly();
     }
@@ -2010,11 +2059,12 @@
         let { y, m } = calendarView;
         m++; if (m > 11) { m = 0; y++; }
         calendarView = { y, m };
+        renderReports();
         renderCalendar();
         renderWeekly();
     }
 
-    // 每周花费：按周一至周日拆分所选月份，统计每周支出
+    // 每周收支：按周一至周日拆分所选月份，统计每周收入 / 支出 / 净额（与上方统一控件联动）
     function renderWeekly() {
         if (!calendarView) return;
         const y = calendarView.y, m = calendarView.m;
@@ -2025,51 +2075,68 @@
         const firstMonday = offset + 1;
         const totalWeeks = firstMonday <= daysInMonth ? Math.floor((daysInMonth - firstMonday) / 7) + 1 : 1;
 
+        const typeSel = document.getElementById('calendar-type');
+        const type = typeSel ? typeSel.value : 'expense';
+
         const weeks = [];
-        for (let wi = 0; wi < totalWeeks; wi++) weeks[wi] = { expense: 0, count: 0 };
+        for (let wi = 0; wi < totalWeeks; wi++) weeks[wi] = { expense: 0, income: 0, count: 0 };
 
         (transactions || []).forEach(t => {
             if (!t || !t.date || getMonthKey(t.date) !== monthKey) return;
             const day = parseInt(t.date.slice(8, 10), 10);
             const wi = day < firstMonday ? 0 : Math.floor((day - firstMonday) / 7);
-            if (!weeks[wi]) weeks[wi] = { expense: 0, count: 0 };
+            if (!weeks[wi]) weeks[wi] = { expense: 0, income: 0, count: 0 };
             const amt = Number(t.amount) || 0;
             if (t.type === 'expense') weeks[wi].expense += amt;
+            else if (t.type === 'income') weeks[wi].income += amt;
             weeks[wi].count++;
         });
+
+        const valueOf = (w) => type === 'income' ? w.income
+            : type === 'net' ? w.income - w.expense : w.expense;
 
         const rows = weeks.map((w, wi) => {
             const monday = firstMonday + wi * 7;
             return {
                 start: Math.max(1, monday),
                 end: Math.min(daysInMonth, monday + 6),
-                expense: w.expense,
+                value: valueOf(w),
                 count: w.count
             };
         });
 
-        let maxExp = 0, totalExp = 0;
-        rows.forEach(r => { if (r.expense > maxExp) maxExp = r.expense; totalExp += r.expense; });
+        let maxAbs = 0, totalValue = 0, totalExp = 0, totalInc = 0;
+        rows.forEach(r => { const a = Math.abs(r.value); if (a > maxAbs) maxAbs = a; totalValue += r.value; });
+        weeks.forEach(w => { totalExp += w.expense; totalInc += w.income; });
 
+        const typeLabel = type === 'income' ? '收入' : type === 'net' ? '净额' : '支出';
         const summary = document.getElementById('weekly-summary');
         const list = document.getElementById('weekly-list');
-        if (summary) summary.textContent = `${monthKey} 共 ${rows.length} 周，合计花费 ${formatCurrency(totalExp)}`;
+        if (summary) summary.textContent = `${monthKey} 共 ${rows.length} 周，合计${typeLabel} ${formatCurrency(totalValue)}（支出 ${formatCurrency(totalExp)} / 收入 ${formatCurrency(totalInc)}）`;
         if (!list) return;
 
-        if (rows.every(r => r.expense === 0)) {
-            list.innerHTML = `<div class="text-center text-slate-400 text-xs py-6">本月暂无支出记录</div>`;
+        if (rows.every(r => r.value === 0)) {
+            list.innerHTML = `<div class="text-center text-slate-400 text-xs py-6">本月暂无${typeLabel}记录</div>`;
             return;
         }
 
         list.innerHTML = rows.map(r => {
-            const pct = maxExp > 0 ? (r.expense / maxExp * 100) : 0;
+            const positive = r.value >= 0;
+            const barColor = type === 'income' ? 'bg-emerald-400'
+                : type === 'expense' ? 'bg-teal-400'
+                : positive ? 'bg-emerald-400' : 'bg-rose-400';
+            const valColor = type === 'income' ? 'text-emerald-700'
+                : type === 'expense' ? 'text-slate-700'
+                : positive ? 'text-emerald-700' : 'text-rose-600';
+            const sign = (type === 'net' && !positive) ? '-' : (type === 'income' ? '+' : '');
+            const pct = maxAbs > 0 ? (Math.abs(r.value) / maxAbs * 100) : 0;
             const label = `${String(r.start).padStart(2, '0')}–${String(r.end).padStart(2, '0')}日`;
             return `<div class="flex items-center gap-3">
                 <div class="w-16 text-[11px] text-slate-500 shrink-0">${label}</div>
                 <div class="flex-1 h-6 bg-slate-50 rounded-lg overflow-hidden">
-                    <div class="h-full rounded-lg bg-teal-400" style="width:${pct}%"></div>
+                    <div class="h-full rounded-lg ${barColor}" style="width:${pct}%"></div>
                 </div>
-                <div class="w-24 text-right text-xs font-semibold text-slate-700">${formatCurrency(r.expense)}</div>
+                <div class="w-24 text-right text-xs font-semibold ${valColor}">${sign}${formatCurrency(r.value)}</div>
                 <div class="w-10 text-right text-[10px] text-slate-400">${r.count}笔</div>
             </div>`;
         }).join('');
